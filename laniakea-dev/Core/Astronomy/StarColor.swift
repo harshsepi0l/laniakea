@@ -35,6 +35,20 @@ enum StarColor {
         return anchors[anchors.count - 1].color
     }
 
+    /// Bins of temperature for drawing many stars in a few batches, from cool to hot.
+    static let binEdges: [Double] = [3_300, 3_900, 4_600, 5_300, 5_950, 6_600, 7_300, 9_000, 12_000, 20_000]
+
+    static func bin(temperature t: Double) -> Int {
+        binEdges.firstIndex { t < $0 } ?? binEdges.count
+    }
+
+    /// A bin's color, taken at the middle of its range in log temperature.
+    static func color(bin: Int) -> RGB {
+        let low = bin == 0 ? 2_800 : binEdges[bin - 1]
+        let high = bin == binEdges.count ? 30_000 : binEdges[bin]
+        return color(temperature: (low * high).squareRoot())
+    }
+
     static func color(bv: Double) -> RGB {
         color(temperature: temperature(bv: bv))
     }

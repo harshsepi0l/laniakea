@@ -7,6 +7,10 @@ struct SolarSystemView: View {
     let planets: [Planet]
     @ObservedObject var clock: SimulationClock
     let selectedPlanetID: String?
+    /// The Sun's surface temperature, which sets its color on the shared star scale.
+    var sunTemperatureK: Double? = nil
+    /// Whether a planet passes the filter on a date (a planet's constellation changes as it moves).
+    var isShown: (Planet, Date) -> Bool = { _, _ in true }
     let onSelect: (Planet) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -192,25 +196,29 @@ struct SolarSystemView: View {
                     }
                     .padding(.leading, 16)
 
-                    ForEach(planets) { planet in
-                        Button {
-                            onSelect(planet)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(planet.id == selectedPlanetID ? Color.orange : Color.primary)
-                                    .frame(width: dotSize(planet), height: dotSize(planet))
-                                    .frame(width: 14)
-                                Text(planet.name)
-                                    .font(.system(size: 15))
-                                    .foregroundColor(planet.id == selectedPlanetID ? .orange : .primary)
-                                Spacer(minLength: 0)
+                    // Refreshes each second: a constellation filter changes as the planets move.
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        ForEach(planets.filter { isShown($0, clock.simulatedDate) }) { planet in
+                            Button {
+                                onSelect(planet)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(planet.composition.swiftUI(dark: colorScheme == .dark))
+                                        .frame(width: dotSize(planet), height: dotSize(planet))
+                                        .overlay(Circle().stroke(Color.orange, lineWidth: planet.id == selectedPlanetID ? 1.5 : 0).padding(-2))
+                                        .frame(width: 14)
+                                    Text(planet.name)
+                                        .font(.system(size: 15))
+                                        .foregroundColor(planet.id == selectedPlanetID ? .orange : .primary)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 44)
+                                .contentShape(Rectangle())
                             }
-                            .padding(.horizontal, 16)
-                            .frame(height: 44)
-                            .contentShape(Rectangle())
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                     Spacer(minLength: 0)
                 }
@@ -288,7 +296,9 @@ struct SolarSystemView: View {
 
     private var ink: Color { colorScheme == .dark ? .white : Color(white: 0.07) }
     private var sunCore: Color {
-        colorScheme == .dark ? Color(red: 1.0, green: 0.69, blue: 0.36) : Color(red: 1.0, green: 0.48, blue: 0.10)
+        if let sunTemperatureK { return StarColor.swiftUI(temperature: sunTemperatureK, dark: colorScheme == .dark) }
+        // Until JPL's data sheet arrives.
+        return colorScheme == .dark ? Color(red: 1.0, green: 0.69, blue: 0.36) : Color(red: 1.0, green: 0.48, blue: 0.10)
     }
 
     private func draw(in context: inout GraphicsContext, camera: TiltCamera) {
@@ -318,7 +328,7 @@ struct SolarSystemView: View {
         struct Placed { let planet: Planet; let point: CGPoint; let radius: CGFloat; let depth: Double }
         var placed: [Placed] = []
 
-        for planet in planets {
+        for planet in planets where isShown(planet, date) {
             // Trail: where the planet was over the last stretch of its orbit, fading toward the past.
             let span = planet.orbit.periodDays * 86_400 * Self.trailFraction
             var previous: CGPoint?
@@ -345,7 +355,7 @@ struct SolarSystemView: View {
         // Far planets first so nearer ones draw on top in 3D.
         for item in placed.sorted(by: { $0.depth > $1.depth }) {
             let selected = item.planet.id == selectedPlanetID
-            let color = selected ? Color.orange : ink
+            let color = item.planet.composition.swiftUI(dark: dark)
             let glow = item.radius * 3.2
             context.fill(
                 circle(item.point, glow),
@@ -355,6 +365,9 @@ struct SolarSystemView: View {
                 )
             )
             context.fill(circle(item.point, item.radius), with: .color(color))
+            if selected {
+                context.stroke(circle(item.point, item.radius + 3), with: .color(.orange), lineWidth: 1.6)
+            }
         }
 
         drawLabels(in: &context, placed: placed.map { ($0.planet, $0.point, $0.radius) }, size: camera.size)
@@ -394,7 +407,7 @@ struct SolarSystemView: View {
         let radius: CGFloat = is3D ? 40 : 28
         var best: (planet: Planet, distance: CGFloat)?
         let space = self.space
-        for planet in planets {
+        for planet in planets where isShown(planet, clock.simulatedDate) {
             guard let projected = camera.project(space.position(planet.orbit.position(at: clock.simulatedDate)))?.point
             else { continue }
             let p = place(projected, in: camera.size)
@@ -421,9 +434,10 @@ struct TiltCamera {
 
     private var pixelsPerUnit: Double { Double(size.width) / 2 / tan(Self.fovDegrees / 2 * .pi / 180) }
 
-    /// Camera distance at which the outermost orbit fills the view when seen from overhead.
+    /// Camera distance at which the outermost orbit fills the view when seen from overhead, leaving
+    /// room at the edge for the outer planet's dot, glow and label.
     private var flatDistance: Double {
-        outerRadius * pixelsPerUnit / (Double(min(size.width, size.height)) / 2 * 0.98)
+        outerRadius * pixelsPerUnit / (Double(min(size.width, size.height)) / 2 * 0.86)
     }
 
     private var pitch: Double { Self.flatPitch + (Self.tiltedPitch - Self.flatPitch) * tilt }
