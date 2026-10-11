@@ -17,8 +17,6 @@ struct SnapiArticle: Codable, Identifiable {
     let published_at: String
     let updated_at: String
     let featured: Bool
-    let launches: [String]
-    let events: [String]
 }
 
 

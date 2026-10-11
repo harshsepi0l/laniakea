@@ -5,3 +5,7 @@ DerivedData/
 build/
 *.xcconfig.local
 Secrets.swift
+.env
+site/
+.venv/
+__pycache__/

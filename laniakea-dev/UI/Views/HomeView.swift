@@ -2,7 +2,6 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var PicOfDayVM: PicOfDayViewModel
-    @State private var selectedURL: URL?
 
     init(picOfDayVM: PicOfDayViewModel) {
         self.PicOfDayVM = picOfDayVM
@@ -29,8 +28,8 @@ struct HomeView: View {
                             .padding(.horizontal, 16)
 
                         if let picOfDay = PicOfDayVM.picOfDay {
-                            Button {
-                                selectedURL = picOfDay.pageURL
+                            NavigationLink {
+                                ArticleDetailView(listing: picOfDay.listing)
                             } label: {
                                 PicOfDayCard(picOfDay: picOfDay)
                             }
@@ -185,10 +184,6 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color(.systemBackground))
         }
-        .sheet(item: $selectedURL) { url in
-            SafariWebView(url: url)
-                .ignoresSafeArea()
-        }
         .onAppear {
             PicOfDayVM.loadPicOfDay()
         }
@@ -251,8 +246,8 @@ struct PicOfDayCard: View {
                 }
 
                 HStack(spacing: 4) {
-                    Text("Read more on NASA Science")
-                    Image(systemName: "arrow.up.right")
+                    Text("Read the full story")
+                    Image(systemName: "chevron.right")
                 }
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.orange)

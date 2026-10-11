@@ -1,0 +1,58 @@
+name: Generate AI articles
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-articles
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out published articles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$remote" gh-pages > /dev/null; then
+            git clone --depth 1 --branch gh-pages "$remote" site
+          else
+            mkdir site
+            git -C site init -b gh-pages
+            git -C site remote add origin "$remote"
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: generator/requirements.txt
+
+      - run: pip install -r generator/requirements.txt
+
+      - name: Generate articles
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OUTPUT_DIR: site
+        run: python generator/generate.py
+
+      - name: Publish to gh-pages
+        working-directory: site
+        run: |
+          touch .nojekyll
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No new articles."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898099+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Add generated articles"
+          git push origin gh-pages

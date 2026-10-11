@@ -3,7 +3,7 @@ import Foundation
 class SnapiArticleAPIService: SnapiArticleRepo {
     
     func fetchSnapiArticle(completion: @escaping (Result<[SnapiArticle], Error>) -> Void) {
-        guard let url = URL(string: "https://api.spaceflightnewsapi.net/v4/articles/") else {
+        guard let url = URL(string: "https://api.spaceflightnewsapi.net/v4/articles/?news_site=NASA,ESA&limit=20") else {
             completion(.failure(NSError(domain: "Invalid URL", code: -1)))
             return
         }

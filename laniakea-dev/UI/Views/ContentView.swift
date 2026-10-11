@@ -11,7 +11,7 @@ struct ContentView: View {
     var body: some View {
         TabView {
             FactsView(snapiArticleVM: snapiArticleVM)
-                .tabItem { Label("Facts", systemImage: "star.fill") }
+                .tabItem { Label("Discover", systemImage: "sparkles") }
 
             AtlasView()
                 .tabItem { Label("Atlas", systemImage: "globe") }
