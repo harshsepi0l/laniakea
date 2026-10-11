@@ -9,7 +9,6 @@ struct GeneratedArticle: Codable, Equatable {
     struct Source: Codable, Equatable {
         let name: String
         let url: String
-        let original_title: String
     }
 
     let title: String
@@ -18,5 +17,4 @@ struct GeneratedArticle: Codable, Equatable {
     let source: Source
     let image_url: String?
     let published_at: String
-    let generated_at: String
 }
