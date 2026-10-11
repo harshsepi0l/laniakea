@@ -27,6 +27,27 @@ class HorizonsPlanetAPIService: PlanetRepo {
         }
     }
 
+    /// The Sun's physical data sheet (Horizons body 10).
+    func loadSun(attempt: Int = 1) async throws -> SunDetails {
+        var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "format", value: "json"), URLQueryItem(name: "COMMAND", value: "'10'"),
+            URLQueryItem(name: "OBJ_DATA", value: "'YES'"), URLQueryItem(name: "MAKE_EPHEM", value: "'NO'"),
+        ]
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        let status = (response as? HTTPURLResponse)?.statusCode
+        if status == 503, attempt < 3 {
+            try await Task.sleep(for: .seconds(attempt))
+            return try await loadSun(attempt: attempt + 1)
+        }
+        guard status == 200 else { throw HorizonsError.badResponse }
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        guard let text = decoded.result, decoded.error == nil, let sun = HorizonsParser.sun(result: text) else {
+            throw HorizonsError.unreadable
+        }
+        return sun
+    }
+
     private struct Response: Decodable {
         let result: String?
         let error: String?
@@ -122,6 +143,37 @@ enum HorizonsParser {
             temperatureK: temperature.flatMap { number(in: $0.value) },
             temperatureIsAtOneBar: temperature?.key.contains("1 bar") ?? false,
             axialTiltDeg: tilt
+        )
+    }
+
+    static func sun(result: String) -> SunDetails? {
+        let facts = keyValues(inHeaderOf: result)
+        guard !facts.isEmpty else { return nil }
+        func value(_ matches: (String) -> Bool) -> Double? {
+            facts.first { matches($0.key.lowercased()) }.flatMap { number(in: $0.value) }
+        }
+        /// Values given as "Name, 10^24 unit".
+        func scaled(_ name: String) -> Double? {
+            facts.lazy.compactMap { pair -> Double? in
+                let key = pair.key.lowercased()
+                guard key.hasPrefix(name), let exponent = firstMatch(#"10\^(\d+)"#, in: key).flatMap(Double.init),
+                      let mantissa = number(in: pair.value)
+                else { return nil }
+                return mantissa * pow(10, exponent)
+            }.first
+        }
+        return SunDetails(
+            radiusKm: value { $0.contains("mean radius") },
+            massKg: scaled("mass"),
+            densityGramsPerCm3: value { $0.contains("density") },
+            surfaceGravity: value { $0.hasPrefix("surface gravity") },
+            escapeSpeedKmS: value { $0.hasPrefix("escape speed") },
+            effectiveTemperatureK: value { $0.hasPrefix("effective temp") },
+            luminosityWatts: scaled("luminosity"),
+            rotationDays: value { $0.contains("rot. per") },
+            axialTiltDeg: value { $0.hasPrefix("obliquity") },
+            speedNearbyStarsKmS: firstMatch(#"nearby stars[\s\S]*?speed:\s*([\d.]+)"#, in: result).flatMap(Double.init),
+            speedCosmicBackgroundKmS: firstMatch(#"CBR[\s\S]*?speed:\s*([\d.]+)"#, in: result).flatMap(Double.init)
         )
     }
 

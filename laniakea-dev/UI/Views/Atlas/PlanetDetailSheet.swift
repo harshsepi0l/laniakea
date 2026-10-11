@@ -69,8 +69,7 @@ struct PlanetDetailSheet: View {
             }
             .padding(20)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .factSheetPresentation()
     }
 
     private func row(_ label: String, _ value: String) -> some View {
