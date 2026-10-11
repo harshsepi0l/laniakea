@@ -1,0 +1,28 @@
+{
+  "id": "2026-10-11",
+  "title": "IceCube Uses Antarctic Ice to Catch Cosmic Neutrinos",
+  "summary": "Scientists have turned nearly 100 melted holes near the South Pole into the largest neutrino detector ever built. Its discoveries have now been recognized with a Nobel Prize in Physics for a founding leader of the project.",
+  "sections": [
+    {
+      "heading": "Holes at the Bottom of the World",
+      "body": "Near the South Pole, scientists melted almost 100 holes into the ice. Each hole became a vertical lake that was used to lower in a long string of light detectors, each about the size of a basketball. Once the string is in place, the water refreezes around it, locking the instruments into the ice."
+    },
+    {
+      "heading": "How the Ice Reveals Neutrinos",
+      "body": "The detectors are sensitive to blue light produced in the surrounding clear ice. That light appears when high-energy neutrinos, which are emitted by powerful processes out in the universe, collide with ice molecules. These collisions free fast-moving secondary particles, and those particles are what give off the glow. IceCube has now detected many of these illuminating neutrinos."
+    },
+    {
+      "heading": "A Record Detector and a Nobel",
+      "body": "The picture shows one of the last IceCube detector strings being lowered into the freezing abyss in 2010. With those strings in place, IceCube became the largest neutrino detector ever created. In recognition of its unprecedented discoveries, it was announced earlier this week that a founding leader of the IceCube Collaboration will receive the Nobel Prize in Physics."
+    }
+  ],
+  "source": {
+    "name": "NASA APOD",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-11-ice-fishing-for-cosmic-neutrinos/",
+    "original_title": "Ice Fishing for Cosmic Neutrinos"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/deephole_icecube_4000.jpg?w=1200&fit=clip",
+  "published_at": "2026-10-11T04:05:00Z",
+  "generated_at": "2026-10-11T15:54:13+00:00",
+  "model": "claude-sonnet-5-5"
+}

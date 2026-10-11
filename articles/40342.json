@@ -1,0 +1,28 @@
+{
+  "id": 40342,
+  "title": "IceCube Turns South Pole Ice Into a Neutrino Detector",
+  "summary": "NASA's Astronomy Picture of the Day highlights the IceCube Neutrino Observatory, built from almost 100 melted holes in the ice near the South Pole. It matters because the facility is the largest neutrino detector ever created, and a founding leader of its collaboration is set to receive the Nobel Prize in Physics.",
+  "sections": [
+    {
+      "heading": "Holes at the Bottom of the World",
+      "body": "Scientists melted almost 100 holes in the ice near the South Pole, and together they now work as an astronomical observatory. Astronomers with the IceCube Neutrino Observatory lowered a long string into each vertical hole. Each string is knotted with basketball-sized light detectors, and the water in the hole soon refreezes around them."
+    },
+    {
+      "heading": "How the Ice Catches Neutrinos",
+      "body": "The detectors are sensitive to blue light produced in the clear ice around them. That light appears when high-energy neutrinos, which are particles released by powerful processes out in the universe, collide with ice molecules. These collisions free fast-moving secondary particles, and those particles give off the blue glow. IceCube has now detected many neutrinos this way."
+    },
+    {
+      "heading": "A Record Detector and a Nobel",
+      "body": "The featured image dates from 2010 and shows one of the last IceCube detector strings being lowered into the ice. With that work, IceCube became the largest neutrino detector ever created. In recognition of its unprecedented discoveries, it was announced earlier this week that a founding leader of the IceCube Collaboration will be awarded the Nobel Prize in Physics."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-11-ice-fishing-for-cosmic-neutrinos/",
+    "original_title": "APOD: 2026 October 11 – Ice Fishing for Cosmic Neutrinos"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/deephole_icecube_4000.jpg",
+  "published_at": "2026-10-11T04:05:00Z",
+  "generated_at": "2026-10-11T15:54:21+00:00",
+  "model": "claude-sonnet-5-5"
+}
