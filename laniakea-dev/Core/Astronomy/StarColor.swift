@@ -11,18 +11,6 @@ enum StarColor {
         4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62))
     }
 
-    static func spectralClass(temperature t: Double) -> Character {
-        switch t {
-        case 30_000...: return "O"
-        case 10_000..<30_000: return "B"
-        case 7_500..<10_000: return "A"
-        case 6_000..<7_500: return "F"
-        case 5_000..<6_000: return "G"
-        case 3_500..<5_000: return "K"
-        default: return "M"
-        }
-    }
-
     // Anchor colors at representative temperatures, blended in log-temperature between them.
     private static let anchors: [(t: Double, color: RGB)] = [
         (3_000, RGB(r: 1.00, g: 0.33, b: 0.30)),   // M: red
