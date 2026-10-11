@@ -227,7 +227,8 @@ struct SolarSystemView: View {
     }
 
     private func dotSize(_ planet: Planet) -> CGFloat {
-        4 + 6 * CGFloat((planet.diameterKm / 142_984).squareRoot())
+        let largest = planets.compactMap(\.meanRadiusKm).max() ?? 1
+        return 4 + 6 * CGFloat(((planet.meanRadiusKm ?? 0) / largest).squareRoot())
     }
 
     // MARK: Zoom
@@ -278,8 +279,10 @@ struct SolarSystemView: View {
     }
 
     private func camera(size: CGSize, tilt t: Double) -> TiltCamera {
-        TiltCamera(size: size, tilt: t)
+        TiltCamera(size: size, tilt: t, outerRadius: space.outerRadius)
     }
+
+    private var space: SceneSpace { SceneSpace(semiMajorAxesAU: planets.map(\.orbit.semiMajorAxisAU)) }
 
     // MARK: Drawing
 
@@ -291,6 +294,8 @@ struct SolarSystemView: View {
     private func draw(in context: inout GraphicsContext, camera: TiltCamera) {
         let dark = colorScheme == .dark
         let date = clock.simulatedDate
+        let space = self.space
+        let largestRadius = planets.compactMap(\.meanRadiusKm).max() ?? 1
 
         // Sun glow and core.
         if let projected = camera.project(.zero) {
@@ -315,12 +320,11 @@ struct SolarSystemView: View {
 
         for planet in planets {
             // Trail: where the planet was over the last stretch of its orbit, fading toward the past.
-            let span = planet.orbitalPeriodDays * 86_400 * Self.trailFraction
+            let span = planet.orbit.periodDays * 86_400 * Self.trailFraction
             var previous: CGPoint?
             for k in 0...Self.trailSegments {
                 let when = date.addingTimeInterval(-span * (1 - Double(k) / Double(Self.trailSegments)))
-                guard let au = PlanetEphemeris.position(of: planet.id, at: when),
-                      let p = camera.project(SceneSpace.position(au))
+                guard let p = camera.project(space.position(planet.orbit.position(at: when)))
                 else { previous = nil; continue }
                 let point = place(p.point, in: camera.size)
                 if let previous {
@@ -333,10 +337,9 @@ struct SolarSystemView: View {
                 previous = point
             }
 
-            guard let au = PlanetEphemeris.position(of: planet.id, at: date),
-                  let p = camera.project(SceneSpace.position(au))
-            else { continue }
-            placed.append(Placed(planet: planet, point: place(p.point, in: camera.size), radius: baseRadius(planet) * p.scale * camera.dotGrowth, depth: p.depth))
+            guard let p = camera.project(space.position(planet.orbit.position(at: date))) else { continue }
+            let radius = baseRadius(planet, largestRadius: largestRadius) * p.scale * camera.dotGrowth
+            placed.append(Placed(planet: planet, point: place(p.point, in: camera.size), radius: radius, depth: p.depth))
         }
 
         // Far planets first so nearer ones draw on top in 3D.
@@ -382,16 +385,17 @@ struct SolarSystemView: View {
         Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
     }
 
-    private func baseRadius(_ planet: Planet) -> CGFloat {
-        2.2 + 3.8 * CGFloat((planet.diameterKm / 142_984).squareRoot())
+    /// Dot size grows with the planet's real radius, relative to the largest planet.
+    private func baseRadius(_ planet: Planet, largestRadius: Double) -> CGFloat {
+        2.2 + 3.8 * CGFloat(((planet.meanRadiusKm ?? 0) / largestRadius).squareRoot())
     }
 
     private func planet(at point: CGPoint, camera: TiltCamera) -> Planet? {
         let radius: CGFloat = is3D ? 40 : 28
         var best: (planet: Planet, distance: CGFloat)?
+        let space = self.space
         for planet in planets {
-            guard let au = PlanetEphemeris.position(of: planet.id, at: clock.simulatedDate),
-                  let projected = camera.project(SceneSpace.position(au))?.point
+            guard let projected = camera.project(space.position(planet.orbit.position(at: clock.simulatedDate)))?.point
             else { continue }
             let p = place(projected, in: camera.size)
             let d = hypot(p.x - point.x, p.y - point.y)
@@ -408,6 +412,8 @@ struct SolarSystemView: View {
 struct TiltCamera {
     let size: CGSize
     let tilt: Double
+    /// Radius of the outermost orbit in layout units.
+    let outerRadius: Double
 
     private static let fovDegrees = 50.0
     private static let flatPitch = 89.5 * Double.pi / 180
@@ -417,7 +423,7 @@ struct TiltCamera {
 
     /// Camera distance at which the outermost orbit fills the view when seen from overhead.
     private var flatDistance: Double {
-        SceneSpace.outerRadius * pixelsPerUnit / (Double(min(size.width, size.height)) / 2 * 0.98)
+        outerRadius * pixelsPerUnit / (Double(min(size.width, size.height)) / 2 * 0.98)
     }
 
     private var pitch: Double { Self.flatPitch + (Self.tiltedPitch - Self.flatPitch) * tilt }

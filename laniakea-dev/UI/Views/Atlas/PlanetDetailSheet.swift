@@ -14,7 +14,7 @@ struct PlanetDetailSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(planet.name)
                         .font(.system(size: 30, weight: .bold))
-                    Text(planet.summary)
+                    Text(orbitSummary)
                         .font(.system(size: 16))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -39,17 +39,31 @@ struct PlanetDetailSheet: View {
                 }
 
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                    fact("Diameter", "\(Self.number(planet.diameterKm)) km")
-                    fact("Mass", "\(planet.massE24Kg.formatted(.number.precision(.significantDigits(3)))) × 10²⁴ kg")
-                    fact("Surface gravity", "\(Self.number(planet.gravity, digits: 1)) m/s²")
-                    fact("Length of day", Self.duration(hours: planet.lengthOfDayHours))
-                    fact("Length of year", Self.duration(hours: planet.orbitalPeriodDays * 24))
-                    fact("Average temperature", "\(Self.number(planet.meanTemperatureC)) °C")
-                    fact("Moons", "\(planet.moons)")
-                    fact("Axial tilt", "\(Self.number(planet.axialTiltDeg, digits: 1))°")
+                    if let radius = planet.meanRadiusKm {
+                        fact("Diameter", "\(Self.number(radius * 2)) km")
+                    }
+                    if let mass = planet.massKg {
+                        fact("Mass", Self.scientific(mass, unit: "kg"))
+                    }
+                    if let gravity = planet.surfaceGravity {
+                        fact(planet.temperatureIsAtOneBar ? "Gravity (cloud tops)" : "Surface gravity", "\(Self.number(gravity, digits: 1)) m/s²")
+                    }
+                    if let density = planet.densityGramsPerCm3 {
+                        fact("Density", "\(Self.number(density, digits: 2)) g/cm³")
+                    }
+                    if let rotation = planet.rotationPeriodHours {
+                        fact("Spins once every", Self.duration(hours: rotation))
+                    }
+                    fact("Length of year", Self.duration(hours: planet.orbit.periodDays * 24))
+                    if let kelvin = planet.temperatureK {
+                        fact(planet.temperatureIsAtOneBar ? "Temperature (cloud tops)" : "Average temperature", "\(Self.number(kelvin - 273.15)) °C")
+                    }
+                    if let tilt = planet.axialTiltDeg {
+                        fact("Axial tilt", "\(Self.number(tilt, digits: tilt < 1 ? 2 : 1))°")
+                    }
                 }
 
-                Text("Source: NASA Planetary Fact Sheet")
+                Text("Source: NASA JPL Horizons")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
@@ -82,6 +96,21 @@ struct PlanetDetailSheet: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.systemGray5), lineWidth: 1))
+    }
+
+    private var orbitSummary: String {
+        let millionKm = planet.orbit.semiMajorAxisAU * Self.kmPerAU / 1_000_000
+        return "Orbits the Sun every \(Self.duration(hours: planet.orbit.periodDays * 24)), "
+            + "at an average distance of \(Self.number(millionKm)) million km."
+    }
+
+    /// e.g. 5.97 × 10²⁴ kg
+    private static func scientific(_ value: Double, unit: String) -> String {
+        let exponent = Int(floor(log10(value)))
+        let mantissa = value / pow(10, Double(exponent))
+        let superscripts: [Character: Character] = ["0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻"]
+        let power = String(String(exponent).compactMap { superscripts[$0] })
+        return "\(number(mantissa, digits: 2)) × 10\(power) \(unit)"
     }
 
     private static func distanceText(au: Double) -> String {

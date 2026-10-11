@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AtlasView: View {
-    @StateObject private var solarSystemVM = SolarSystemViewModel(repo: BundlePlanetRepo())
+    @StateObject private var solarSystemVM = SolarSystemViewModel(repo: HorizonsPlanetAPIService())
     @State private var searchText = ""
     @State private var selectedCategory = "Planets"
 
@@ -61,7 +61,9 @@ struct AtlasView: View {
     private var content: some View {
         if selectedCategory == "Planets" {
             if let error = solarSystemVM.errorMessage {
-                placeholder(icon: "exclamationmark.triangle", title: "Planets unavailable", message: error)
+                placeholder(icon: "exclamationmark.triangle", title: "Planets unavailable", message: error) {
+                    solarSystemVM.load()
+                }
             } else if solarSystemVM.planets.isEmpty {
                 ProgressView().frame(maxHeight: .infinity)
             } else {
@@ -126,7 +128,7 @@ struct AtlasView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    private func placeholder(icon: String, title: String, message: String) -> some View {
+    private func placeholder(icon: String, title: String, message: String, retry: (() -> Void)? = nil) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 40))
@@ -137,6 +139,11 @@ struct AtlasView: View {
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            if let retry {
+                Button("Try again", action: retry)
+                    .buttonStyle(.bordered)
+                    .tint(.orange)
+            }
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

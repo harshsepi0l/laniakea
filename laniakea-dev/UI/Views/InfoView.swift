@@ -9,12 +9,10 @@ struct InfoView: View {
     }
 
     private let credits = [
-        Credit(title: "Star catalog", detail: "d3-celestial by Olaf Frohn (BSD 3-Clause), from the XHIP catalog",
-               url: "https://github.com/ofrohn/d3-celestial"),
-        Credit(title: "Planet positions", detail: "NASA JPL, Approximate Positions of the Planets (E.M. Standish)",
-               url: "https://ssd.jpl.nasa.gov/planets/approx_pos.html"),
-        Credit(title: "Planet facts", detail: "NASA Planetary Fact Sheet",
-               url: "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
+        Credit(title: "Planet orbits and facts", detail: "NASA JPL Horizons System",
+               url: "https://ssd.jpl.nasa.gov/horizons/"),
+        Credit(title: "Star catalog", detail: "Yale Bright Star Catalogue (Hoffleit & Warren), via CDS VizieR",
+               url: "https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=V/50"),
         Credit(title: "Astronomy Picture of the Day", detail: "NASA Science",
                url: "https://science.nasa.gov/apod/"),
         Credit(title: "Space news", detail: "Spaceflight News API, with stories from NASA and ESA",

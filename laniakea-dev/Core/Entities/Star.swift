@@ -1,6 +1,6 @@
 import Foundation
 
-struct Star: Equatable {
+struct Star: Codable, Equatable {
     let raDeg: Double
     let decDeg: Double
     let magnitude: Double

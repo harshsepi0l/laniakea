@@ -5,6 +5,7 @@ import Foundation
 class SolarSystemViewModel: ObservableObject {
     @Published private(set) var planets: [Planet] = []
     @Published private(set) var errorMessage: String?
+    @Published private(set) var isLoading = false
     @Published var selectedPlanet: Planet?
     private(set) var selectionDate = Date()
     let clock = SimulationClock()
@@ -27,11 +28,17 @@ class SolarSystemViewModel: ObservableObject {
     }
 
     func load() {
-        guard planets.isEmpty else { return }
-        do {
-            planets = try repo.loadPlanets()
-        } catch {
-            errorMessage = "Planet data couldn't be loaded."
+        guard planets.isEmpty, !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        Task { @MainActor in
+            defer { isLoading = false }
+            do {
+                planets = try await repo.loadPlanets()
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? "Planet data couldn't be loaded from NASA JPL. Check your connection and try again."
+            }
         }
     }
 
@@ -43,15 +50,14 @@ class SolarSystemViewModel: ObservableObject {
 
     /// Distance from the Sun at the selection date, in au.
     func distanceFromSun(_ planet: Planet) -> Double? {
-        PlanetEphemeris.position(of: planet.id, at: selectionDate).map { simd_length($0) }
+        simd_length(planet.orbit.position(at: selectionDate))
     }
 
     /// Distance from Earth at the selection date, in au.
     func distanceFromEarth(_ planet: Planet) -> Double? {
-        guard planet.id != "earth",
-              let p = PlanetEphemeris.position(of: planet.id, at: selectionDate),
-              let earth = PlanetEphemeris.position(of: "earth", at: selectionDate)
+        guard planet.id != Planet.earthID,
+              let earth = planets.first(where: { $0.id == Planet.earthID })
         else { return nil }
-        return simd_length(p - earth)
+        return simd_length(planet.orbit.position(at: selectionDate) - earth.orbit.position(at: selectionDate))
     }
 }

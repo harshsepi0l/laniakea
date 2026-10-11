@@ -1,3 +1,3 @@
 protocol PlanetRepo {
-    func loadPlanets() throws -> [Planet]
+    func loadPlanets() async throws -> [Planet]
 }
