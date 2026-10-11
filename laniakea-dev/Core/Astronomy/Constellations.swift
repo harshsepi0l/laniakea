@@ -55,4 +55,46 @@ enum Constellation {
     ]
 
     static func name(_ abbreviation: String) -> String { names[abbreviation] ?? abbreviation }
+
+    /// The 88 constellations' official IAU genitive forms, used in star names ("β Geminorum").
+    static let genitives: [String: String] = [
+        "And": "Andromedae", "Ant": "Antliae", "Aps": "Apodis", "Aqr": "Aquarii", "Aql": "Aquilae", "Ara": "Arae",
+        "Ari": "Arietis", "Aur": "Aurigae", "Boo": "Boötis", "Cae": "Caeli", "Cam": "Camelopardalis", "Cnc": "Cancri",
+        "CVn": "Canum Venaticorum", "CMa": "Canis Majoris", "CMi": "Canis Minoris", "Cap": "Capricorni",
+        "Car": "Carinae", "Cas": "Cassiopeiae", "Cen": "Centauri", "Cep": "Cephei", "Cet": "Ceti",
+        "Cha": "Chamaeleontis", "Cir": "Circini", "Col": "Columbae", "Com": "Comae Berenices",
+        "CrA": "Coronae Australis", "CrB": "Coronae Borealis", "Crv": "Corvi", "Crt": "Crateris", "Cru": "Crucis",
+        "Cyg": "Cygni", "Del": "Delphini", "Dor": "Doradus", "Dra": "Draconis", "Equ": "Equulei", "Eri": "Eridani",
+        "For": "Fornacis", "Gem": "Geminorum", "Gru": "Gruis", "Her": "Herculis", "Hor": "Horologii", "Hya": "Hydrae",
+        "Hyi": "Hydri", "Ind": "Indi", "Lac": "Lacertae", "Leo": "Leonis", "LMi": "Leonis Minoris", "Lep": "Leporis",
+        "Lib": "Librae", "Lup": "Lupi", "Lyn": "Lyncis", "Lyr": "Lyrae", "Men": "Mensae", "Mic": "Microscopii",
+        "Mon": "Monocerotis", "Mus": "Muscae", "Nor": "Normae", "Oct": "Octantis", "Oph": "Ophiuchi", "Ori": "Orionis",
+        "Pav": "Pavonis", "Peg": "Pegasi", "Per": "Persei", "Phe": "Phoenicis", "Pic": "Pictoris", "Psc": "Piscium",
+        "PsA": "Piscis Austrini", "Pup": "Puppis", "Pyx": "Pyxidis", "Ret": "Reticuli", "Sge": "Sagittae",
+        "Sgr": "Sagittarii", "Sco": "Scorpii", "Scl": "Sculptoris", "Sct": "Scuti", "Ser": "Serpentis",
+        "Sex": "Sextantis", "Tau": "Tauri", "Tel": "Telescopii", "Tri": "Trianguli", "TrA": "Trianguli Australis",
+        "Tuc": "Tucanae", "UMa": "Ursae Majoris", "UMi": "Ursae Minoris", "Vel": "Velorum", "Vir": "Virginis",
+        "Vol": "Volantis", "Vul": "Vulpeculae",
+    ]
+
+    /// A star's traditional designation from the Bright Star Catalogue's name field, such as
+    /// "78Bet Gem" → "β Geminorum", "73Xi 2Cet" → "ξ² Ceti", "41    And" → "41 Andromedae".
+    static func designation(brightStarName raw: String) -> String? {
+        guard let match = raw.firstMatch(of: #/^\s*(\d*)\s*([A-Z][a-z]{1,2})?\s*(\d)?\s*([A-Z][A-Za-z]{2})\s*$/#),
+              let genitive = genitives[String(match.4)]
+        else { return nil }
+        if let greek = match.2.flatMap({ greekLetters[String($0)] }) {
+            let index = match.3.map { String($0).compactMap { superscripts[$0] } }.map { String($0) } ?? ""
+            return "\(greek)\(index) \(genitive)"
+        }
+        let number = String(match.1)
+        return number.isEmpty ? nil : "\(number) \(genitive)"
+    }
+
+    private static let greekLetters: [String: String] = [
+        "Alp": "α", "Bet": "β", "Gam": "γ", "Del": "δ", "Eps": "ε", "Zet": "ζ", "Eta": "η", "The": "θ", "Iot": "ι",
+        "Kap": "κ", "Lam": "λ", "Mu": "μ", "Nu": "ν", "Xi": "ξ", "Omi": "ο", "Pi": "π", "Rho": "ρ", "Sig": "σ",
+        "Tau": "τ", "Ups": "υ", "Phi": "φ", "Chi": "χ", "Psi": "ψ", "Ome": "ω",
+    ]
+    private static let superscripts: [Character: Character] = ["1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"]
 }

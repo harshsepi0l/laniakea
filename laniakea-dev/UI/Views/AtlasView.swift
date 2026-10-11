@@ -6,6 +6,7 @@ struct AtlasView: View {
     @State private var searchText = ""
     @State private var focusID: String?
     @State private var factSubject: FactSubject?
+    @State private var showSky = false
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,17 @@ struct AtlasView: View {
                             .background(Color(.systemGray6), in: Circle())
                     }
                     .accessibilityLabel("Facts about \(cosmos.current == .solarSystem ? "the Sun" : cosmos.current.title)")
+                    Button {
+                        showSky = true
+                    } label: {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(Color(.systemGray6), in: Circle())
+                    }
+                    .accessibilityLabel("Sky view")
+                    .accessibilityHint("Point your device at the sky to find stars and planets")
                     Spacer(minLength: 8)
                     Breadcrumb(path: cosmos.path) { cosmos.goBack(to: $0) }
                 }
@@ -41,7 +53,9 @@ struct AtlasView: View {
                 // Planets move between constellations while the clock plays, so the Solar System's
                 // counts refresh each second.
                 TimelineView(.periodic(from: .now, by: cosmos.current == .solarSystem ? 1 : 3600)) { _ in
-                    FilterBar(kinds: filterKinds, constellations: filterConstellations, filter: $cosmos.filter)
+                    FilterBar(kinds: filterKinds, constellations: filterConstellations, filter: $cosmos.filter) {
+                        factSubject = .constellation($0)
+                    }
                 }
                 .padding(.vertical, 8)
 
@@ -69,6 +83,20 @@ struct AtlasView: View {
                     distanceDateLabel: solarSystemVM.selectionDateLabel
                 )
             }
+        }
+        .fullScreenCover(isPresented: $showSky) {
+            SkyView(
+                onOpenInAtlas: { place, focus in
+                    showSky = false
+                    cosmos.open(place)
+                    focusID = focus
+                },
+                onOpenPlanet: { planet in
+                    showSky = false
+                    cosmos.open(.solarSystem)
+                    solarSystemVM.select(planet)
+                }
+            )
         }
         .onAppear {
             solarSystemVM.load()
@@ -460,6 +488,8 @@ struct FilterBar: View {
     /// Nil hides the constellation menu; empty shows it disabled while the boundaries load.
     let constellations: [(abbreviation: String, count: Int)]?
     @Binding var filter: AtlasFilter
+    /// Opens the selected constellation's fact sheet.
+    var onConstellationFacts: (String) -> Void = { _ in }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -479,6 +509,14 @@ struct FilterBar: View {
                              selected: filter.constellation != nil)
                     }
                     .disabled(constellations.isEmpty && filter.constellation == nil)
+                    if let abbreviation = filter.constellation {
+                        Button { onConstellationFacts(abbreviation) } label: {
+                            Image(systemName: "info").font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.primary).frame(width: 34, height: 34)
+                                .background(Color(.systemGray6), in: Circle())
+                        }
+                        .accessibilityLabel("Facts about \(Constellation.name(abbreviation))")
+                    }
                 }
                 if kinds.count > 1 || !filter.kinds.isEmpty {
                     ForEach(kinds, id: \.kind) { item in

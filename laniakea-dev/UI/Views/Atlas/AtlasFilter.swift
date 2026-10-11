@@ -6,7 +6,8 @@ enum ObjectKind: String, CaseIterable, Hashable {
     case cluster, group, loneGalaxy
     // Galaxies, by Hubble type
     case spiral, lenticular, elliptical, irregular, dwarfSpheroidal, unknownGalaxy
-    // Stars, by spectral class
+    // Stars: which set they belong to, then spectral class
+    case withPlanets, nakedEye
     case hotStar, fStar, gStar, kStar, mStar, brownDwarf, whiteDwarf, unknownStar
     // Planets around other stars, by size
     case earthSize, superEarth, neptuneSize, jupiterSize, largerThanJupiter, unknownSize
@@ -24,11 +25,13 @@ enum ObjectKind: String, CaseIterable, Hashable {
         case .irregular: return "Irregulars"
         case .dwarfSpheroidal: return "Dwarf spheroidals"
         case .unknownGalaxy: return "Type unknown"
-        case .hotStar: return "Hot stars (O, B, A)"
-        case .fStar: return "F stars"
-        case .gStar: return "Sun-like (G)"
-        case .kStar: return "K stars"
-        case .mStar: return "Red dwarfs (M)"
+        case .withPlanets: return "With planets"
+        case .nakedEye: return "Naked-eye stars"
+        case .hotStar: return "Blue-white (O, B, A)"
+        case .fStar: return "Yellow-white (F)"
+        case .gStar: return "Yellow (G)"
+        case .kStar: return "Orange (K)"
+        case .mStar: return "Red (M)"
         case .brownDwarf: return "Brown dwarfs"
         case .whiteDwarf: return "White dwarfs"
         case .unknownStar: return "Type unknown"
@@ -40,6 +43,15 @@ enum ObjectKind: String, CaseIterable, Hashable {
         case .unknownSize: return "Size unknown"
         case .rocky: return "Rocky planets"
         case .giant: return "Giant planets"
+        }
+    }
+
+    /// Kinds in the same facet are alternatives (spirals or ellipticals); the filter combines facets
+    /// with "and" (naked-eye stars that are also Sun-like).
+    var facet: Int {
+        switch self {
+        case .withPlanets, .nakedEye: return 1
+        default: return 0
         }
     }
 
@@ -140,7 +152,14 @@ struct AtlasFilter: Equatable {
     var isActive: Bool { !kinds.isEmpty || constellation != nil }
 
     func allows(kind: ObjectKind?, constellation: String?) -> Bool {
-        if !kinds.isEmpty, !(kind.map(kinds.contains) ?? false) { return false }
+        allows(kinds: kind.map { [$0] } ?? [], constellation: constellation)
+    }
+
+    /// An object passes when, in every facet with a selection, it has one of the selected kinds.
+    func allows(kinds objectKinds: [ObjectKind], constellation: String?) -> Bool {
+        for facet in Set(kinds.map(\.facet)) where !objectKinds.contains(where: { $0.facet == facet && kinds.contains($0) }) {
+            return false
+        }
         if let wanted = self.constellation, constellation != wanted { return false }
         return true
     }
@@ -153,6 +172,9 @@ enum FactSubject: Identifiable, Hashable {
     case galaxy(Galaxy, groupName: String)
     case milkyWay
     case starSystem(StarSystem)
+    case nakedEyeStar(NakedEyeStar)
+    /// One of the 88 constellations, by IAU abbreviation.
+    case constellation(String)
     case sun
 
     var id: String {
@@ -162,6 +184,8 @@ enum FactSubject: Identifiable, Hashable {
         case .galaxy(let g, _): return "galaxy-\(g.id)"
         case .milkyWay: return "milky-way"
         case .starSystem(let s): return "star-\(s.id)"
+        case .nakedEyeStar(let s): return "naked-\(s.id)"
+        case .constellation(let abbreviation): return "constellation-\(abbreviation)"
         case .sun: return "sun"
         }
     }

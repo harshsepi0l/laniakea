@@ -84,6 +84,12 @@ struct CosmicGraphView: View {
                 focus(on: index, size: geo.size)
                 focusID = nil
             }
+            // A focus asked for before this map existed (arriving from the sky view).
+            .onAppear {
+                guard let id = focusID, let index = scene.nodes.firstIndex(where: { $0.id == id }) else { return }
+                focus(on: index, size: geo.size)
+                focusID = nil
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: selected)
         .accessibilityElement(children: .contain)
@@ -185,6 +191,18 @@ struct CosmicGraphView: View {
             soft.addFilter(.blur(radius: max(side * 0.65, 2)))
             soft.fill(path, with: .color(here.opacity(dark ? 0.13 : 0.12)))
         }
+        // Laniakea's edge: a soft orange glow under a crisp line.
+        if !scene.regionOutline.isEmpty {
+            var edge = Path()
+            for (a, b) in scene.regionOutline {
+                edge.move(to: screenPoint(a, size: size, scale: scale))
+                edge.addLine(to: screenPoint(b, size: size, scale: scale))
+            }
+            var glow = context
+            glow.addFilter(.blur(radius: 4))
+            glow.stroke(edge, with: .color(here.opacity(0.55)), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+            context.stroke(edge, with: .color(here.opacity(0.9)), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
+        }
 
         // Links.
         var links = Path()
@@ -262,7 +280,7 @@ struct CosmicGraphView: View {
             let n = scene.nodes[i]
             guard isVisible(i), screen.contains(points[i]) else { return false }
             if n.isHere || i == selected || highlight.contains(i) { return true }
-            return n.size >= detailThreshold && !n.name.hasPrefix("PGC ")
+            return n.size >= detailThreshold && !n.name.hasPrefix("PGC ") && !n.name.hasPrefix("HR ")
         }
         order.sort { a, b in
             let ra = labelRank(a, highlight: highlight), rb = labelRank(b, highlight: highlight)

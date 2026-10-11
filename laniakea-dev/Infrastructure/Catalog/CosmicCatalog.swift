@@ -12,22 +12,20 @@ import simd
 /// | Galaxy colors | RC3 (de Vaucouleurs et al. 1991) via VizieR |
 /// | Stars with planets, and their planets | NASA Exoplanet Archive |
 /// | Solar System planets | JPL Horizons |
-/// | Naked-eye stars | Yale Bright Star Catalogue via VizieR |
+/// | Naked-eye stars | Yale Bright Star Catalogue, Hipparcos, JSDC and PASTEL via VizieR; IAU star names |
 /// | Constellation boundaries | IAU boundaries (Roman 1987) from CDS |
-final class CosmicCatalog: CosmicRepo, PlanetRepo, StarRepo {
+final class CosmicCatalog: CosmicRepo, PlanetRepo {
     static let shared = CosmicCatalog()
 
     private let horizons = HorizonsPlanetAPIService()
-    private let brightStars = VizieRStarAPIService()
     private let boundary = LaniakeaBoundarySource()
 
     private static let catalogAge: TimeInterval = 180 * 86400
     private static let exoplanetAge: TimeInterval = 7 * 86400
 
-    // MARK: Solar System and stars
+    // MARK: Solar System
 
     func loadPlanets() async throws -> [Planet] { try await horizons.loadPlanets() }
-    func loadStars() async throws -> [Star] { try await brightStars.loadStars() }
 
     // MARK: Laniakea
 
@@ -152,9 +150,9 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo, StarRepo {
     }
 
     func details(of galaxy: Galaxy) async throws -> GalaxyDetails {
-        try await cached(DiskCache<GalaxyDetails>(name: "galaxy-details-v2-\(galaxy.id)"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<GalaxyDetails>(name: "galaxy-details-v3-\(galaxy.id)"), maxAge: Self.catalogAge) {
             async let simbadTask = TAPClient.simbad.query("""
-                SELECT b.morph_type, b.galdim_majaxis, b.rvz_radvel FROM basic AS b JOIN ident AS i ON i.oidref = b.oid \
+                SELECT b.morph_type, b.galdim_majaxis, b.galdim_minaxis, b.galdim_angle, b.rvz_radvel FROM basic AS b JOIN ident AS i ON i.oidref = b.oid \
                 WHERE i.id = 'PGC \(galaxy.id)'
                 """)
             async let cf4Task = TAPClient.vizier.query("""
@@ -169,6 +167,8 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo, StarRepo {
             return GalaxyDetails(
                 morphology: s?["morph_type"].flatMap { $0.isEmpty ? nil : $0 },
                 majorAxisArcmin: s?.double("galdim_majaxis"),
+                minorAxisArcmin: s?.double("galdim_minaxis"),
+                positionAngleDeg: s?.double("galdim_angle"),
                 velocityKmS: s?.double("rvz_radvel"),
                 methods: columns.compactMap { c?.double($0.0) != nil ? $0.1 : nil }
             )
@@ -178,12 +178,12 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo, StarRepo {
     // MARK: Exoplanets
 
     func starSystems() async throws -> [StarSystem] {
-        try await cached(DiskCache<[StarSystem]>(name: "exoplanet-hosts-v2"), maxAge: Self.exoplanetAge) {
+        try await cached(DiskCache<[StarSystem]>(name: "exoplanet-hosts-v3"), maxAge: Self.exoplanetAge) {
             // One row per star. sy_pnum counts planets around every star in a multiple system (55 Cnc B
             // would show 7), so count each star's own planets instead.
             let rows = try await TAPClient.exoplanetArchive.query("""
                 select hostname, avg(ra) as ra, avg(dec) as dec, max(sy_dist) as sy_dist, count(*) as planets, \
-                max(st_spectype) as st_spectype, max(st_teff) as st_teff from pscomppars where sy_dist is not null group by hostname
+                max(st_spectype) as st_spectype, max(st_teff) as st_teff, max(hd_name) as hd_name from pscomppars where sy_dist is not null group by hostname
                 """)
             return try Self.nonEmpty("Stars with planets", rows.compactMap { row in
                 guard let name = row["hostname"], !name.isEmpty,
@@ -194,6 +194,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo, StarRepo {
                     id: name, name: name, distanceParsecs: d, planetCount: row.int("planets") ?? 1,
                     spectralType: row["st_spectype"].flatMap { $0.isEmpty ? nil : $0 },
                     temperatureK: row.double("st_teff"),
+                    hd: row["hd_name"].flatMap { Int($0.replacingOccurrences(of: "HD", with: "").trimmingCharacters(in: .whitespaces)) },
                     position: SkyCoordinates.cartesian(longitudeDeg: g.l, latitudeDeg: g.b, distance: d)
                 )
             })
@@ -241,6 +242,112 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo, StarRepo {
                 apparentMagnitude: row.double("sy_vmag"), starCount: row.int("sy_snum")
             )
         }
+    }
+
+    // MARK: Naked-eye stars
+
+    func nakedEyeStars() async throws -> [NakedEyeStar] {
+        try await cached(DiskCache<[NakedEyeStar]>(name: "naked-eye-stars-v2"), maxAge: Self.catalogAge) {
+            // The Bright Star Catalogue's own parallaxes are old, so join the Hipparcos new reduction
+            // through the HD numbers in the original Hipparcos catalog.
+            async let starsTask = TAPClient.vizier.query("""
+                SELECT b.HR, b.Name, b.HD, b.RAJ2000, b.DEJ2000, b.Vmag, b."B-V", b.SpType, h2.Plx, h2.e_Plx \
+                FROM "V/50/catalog" AS b LEFT JOIN "I/239/hip_main" AS h ON h.HD = b.HD \
+                LEFT JOIN "I/311/hip2" AS h2 ON h2.HIP = h.HIP WHERE b.Vmag <= 6
+                """)
+            async let diametersTask = TAPClient.vizier.query("""
+                SELECT RAJ2000, DEJ2000, LDD FROM "II/346/jsdc_v2" WHERE Vmag <= 6.5 AND LDD > 0
+                """)
+            async let temperaturesTask = TAPClient.vizier.query("""
+                SELECT ID, RAdeg, DEdeg, Teff FROM "B/pastel/pastel" WHERE Vmag <= 6.5 AND Teff IS NOT NULL
+                """)
+            async let namesTask = try? Self.iauStarNames()
+            let (rows, diameterRows, temperatureRows, names) = try await (starsTask, diametersTask, temperaturesTask, namesTask)
+
+            // Both catalogs name stars their own way, so they're matched to the Bright Star Catalogue by position.
+            let diameters = PositionIndex(diameterRows.compactMap { row in
+                guard let ra = row.double("RAJ2000"), let dec = row.double("DEJ2000"), let ldd = row.double("LDD") else { return nil }
+                return (ra, dec, ldd)
+            })
+            let temperatures = PositionIndex(medianTemperatures(temperatureRows))
+
+            var seen = Set<Int>()
+            let stars = rows.compactMap { row -> NakedEyeStar? in
+                guard let hr = row.int("HR"), seen.insert(hr).inserted, let ra = row.double("RAJ2000"),
+                      let dec = row.double("DEJ2000"), let v = row.double("Vmag")
+                else { return nil }
+                let hd = row.int("HD")
+                let type = row["SpType"].map { $0.trimmingCharacters(in: .whitespaces) }
+                return NakedEyeStar(
+                    id: hr, properName: hd.flatMap { names?[$0] }, designation: row["Name"].flatMap(Constellation.designation),
+                    hd: hd, raDeg: ra, decDeg: dec, magnitude: v,
+                    bMinusV: row.double("B-V"), spectralType: type?.isEmpty == false ? type : nil,
+                    parallaxMas: row.double("Plx"), parallaxErrorMas: row.double("e_Plx"),
+                    angularDiameterMas: diameters.value(nearRA: ra, dec: dec),
+                    measuredTemperatureK: temperatures.value(nearRA: ra, dec: dec)
+                )
+            }
+            return try Self.nonEmpty("Naked-eye stars", stars)
+        }
+    }
+
+    /// Official star names from the IAU Working Group on Star Names' catalog (IAU-CSN), by HD number.
+    private static func iauStarNames() async throws -> [Int: String] {
+        let url = URL(string: "https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw CatalogError.badResponse(url.host ?? "") }
+        var names: [Int: String] = [:]
+        for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
+            guard let first = line.first, first != "#", first != "$", line.count > 18 else { continue }
+            // The first column is 18 characters wide (names can have spaces); the HD number sits three
+            // columns before the date.
+            let name = line.prefix(18).trimmingCharacters(in: .whitespaces)
+            let tokens = line.split(separator: " ")
+            guard let dateIndex = tokens.firstIndex(where: { $0.wholeMatch(of: #/\d{4}-\d{2}-\d{2}/#) != nil }), dateIndex >= 3,
+                  let hd = Int(tokens[dateIndex - 3]), !name.isEmpty, names[hd] == nil
+            else { continue }
+            names[hd] = name
+        }
+        return names
+    }
+
+    /// PASTEL lists each published temperature separately under SIMBAD's name; this groups them per
+    /// star and keeps the median, which shrugs off the odd outlier.
+    private func medianTemperatures(_ rows: [TAPClient.Row]) -> [(ra: Double, dec: Double, value: Double)] {
+        var byStar: [String: (ra: Double, dec: Double, values: [Double])] = [:]
+        for row in rows {
+            guard let id = row["ID"], let ra = row.double("RAdeg"), let dec = row.double("DEdeg"), let t = row.double("Teff") else { continue }
+            byStar[id, default: (ra, dec, [])].values.append(t)
+        }
+        return byStar.values.map { star in
+            let v = star.values.sorted()
+            let median = v.count % 2 == 1 ? v[v.count / 2] : (v[v.count / 2 - 1] + v[v.count / 2]) / 2
+            return (star.ra, star.dec, median)
+        }
+    }
+
+    /// Values looked up by sky position: the entry within 1′ of a position, if any.
+    private struct PositionIndex {
+        private var cells: [SIMD2<Int>: [(ra: Double, dec: Double, value: Double)]] = [:]
+
+        init(_ entries: [(ra: Double, dec: Double, value: Double)]) {
+            for e in entries { cells[Self.cell(e.ra, e.dec), default: []].append(e) }
+        }
+
+        func value(nearRA ra: Double, dec: Double) -> Double? {
+            let c = Self.cell(ra, dec)
+            var best: (separation: Double, value: Double)?
+            for dx in -1...1 { for dy in -1...1 {
+                for e in cells[c &+ SIMD2(dx, dy)] ?? [] {
+                    let dRA = (e.ra - ra) * cos(dec * .pi / 180), dDec = e.dec - dec
+                    let separation = (dRA * dRA + dDec * dDec).squareRoot()
+                    if separation < 1.0 / 60, separation < (best?.separation ?? .infinity) { best = (separation, e.value) }
+                }
+            } }
+            return best?.value
+        }
+
+        private static func cell(_ ra: Double, _ dec: Double) -> SIMD2<Int> { SIMD2(Int(floor(ra * 10)), Int(floor(dec * 10))) }
     }
 
     // MARK: Sun and constellations

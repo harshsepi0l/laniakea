@@ -12,56 +12,59 @@ struct FactSheetView: View {
     var body: some View {
         let sheet = model.sheet
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 10) {
-                        if let t = sheet.temperatureK {
-                            let color = StarColor.swiftUI(temperature: t, dark: colorScheme == .dark)
-                            Circle().fill(color).frame(width: 16, height: 16).shadow(color: color.opacity(0.7), radius: 6)
+            VStack(alignment: .leading, spacing: 0) {
+                if let header = sheet.header { FactHeaderView(header: header) }
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            if let t = sheet.temperatureK {
+                                let color = StarColor.swiftUI(temperature: t, dark: colorScheme == .dark)
+                                Circle().fill(color).frame(width: 16, height: 16).shadow(color: color.opacity(0.7), radius: 6)
+                            }
+                            Text(sheet.title).font(.system(size: 30, weight: .bold))
+                            if model.isLoading { ProgressView() }
                         }
-                        Text(sheet.title).font(.system(size: 30, weight: .bold))
-                        if model.isLoading { ProgressView() }
-                    }
-                    Text(sheet.summary).font(.system(size: 16)).foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                if let error = model.error {
-                    HStack(spacing: 12) {
-                        Text(error).font(.system(size: 14)).foregroundColor(.secondary)
+                        Text(sheet.summary).font(.system(size: 16)).foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 0)
-                        Button("Try again") { Task { await model.load() } }
-                            .buttonStyle(.bordered).tint(.orange)
                     }
-                }
 
-                if !sheet.facts.isEmpty {
-                    FactGrid(facts: sheet.facts)
-                }
+                    if let error = model.error {
+                        HStack(spacing: 12) {
+                            Text(error).font(.system(size: 14)).foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            Button("Try again") { Task { await model.load() } }
+                                .buttonStyle(.bordered).tint(.orange)
+                        }
+                    }
 
-                ForEach(sheet.lists) { list in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(list.title).font(.system(size: 15, weight: .semibold))
-                        ForEach(list.items, id: \.self) { item in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Circle().fill(Color.orange).frame(width: 5, height: 5)
-                                Text(item).font(.system(size: 15)).fixedSize(horizontal: false, vertical: true)
+                    if !sheet.facts.isEmpty {
+                        FactGrid(facts: sheet.facts)
+                    }
+
+                    ForEach(sheet.lists) { list in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(list.title).font(.system(size: 15, weight: .semibold))
+                            ForEach(list.items, id: \.self) { item in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Circle().fill(Color.orange).frame(width: 5, height: 5)
+                                    Text(item).font(.system(size: 15)).fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
                     }
-                }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(sheet.notes, id: \.self) { note in
-                        Text(note).font(.system(size: 13)).foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(sheet.notes, id: \.self) { note in
+                            Text(note).font(.system(size: 13)).foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Text("Source: \(sheet.source)").font(.system(size: 12)).foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("Source: \(sheet.source)").font(.system(size: 12)).foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(20)
             }
-            .padding(20)
         }
         .task { await model.load() }
         .factSheetPresentation()
