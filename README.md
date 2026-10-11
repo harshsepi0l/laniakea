@@ -64,10 +64,10 @@ The astronomy is meant to match the scientific literature:
 
 ## Credits
 
-Built by [@harshsepi0l](https://github.com/harshsepi0l), with [Claude Code](https://claude.com/claude-code).
+Built by [@harshsepi0l](https://github.com/harshsepi0l).
 
 The data comes from the teams behind Cosmicflows, CDS (VizieR and SIMBAD), the NASA Exoplanet Archive, NASA JPL, NASA, ESA and the Spaceflight News API. The **Info** tab credits each one in full.
 
 ## License
 
-© 2026 harshsepi0l. All rights reserved. This repository is not open source: the code, design and content may not be copied, modified or redistributed without permission.
+© 2026 harshsepi0l. All rights reserved. This repository is not open source: the code, design and content may not be copied, modified or redistributed without permission. See [LICENSE](LICENSE).
