@@ -1,0 +1,32 @@
+{
+  "id": 40317,
+  "title": "Webb Image Shows Distant Galaxies Warped by Gravitational Lensing",
+  "summary": "NASA's James Webb Space Telescope released an image of galaxy cluster MACS J0454.1-0300, where distant galaxies appear bent and multiplied. It shows how gravitational lensing lets astronomers see objects far behind a cluster.",
+  "sections": [
+    {
+      "heading": "A Cosmic House of Mirrors",
+      "body": "A new image from NASA's James Webb Space Telescope, released on Sept. 29, 2026, shows galaxies that seem to warp and multiply, as if reflected in a house of mirrors. The scene centers on a galaxy cluster called MACS J0454.1-0300. The image is credited to ESA/Webb, NASA & CSA, L. Furtak, and S. Fujimoto."
+    },
+    {
+      "heading": "Golden Cluster Galaxies",
+      "body": "The brilliant golden galaxies in the picture belong to the galaxy cluster MACS J0454.1-0300. A galaxy cluster is a large group of galaxies held together by gravity. These golden members sit in the foreground of the scene."
+    },
+    {
+      "heading": "Orange Galaxies Far Behind",
+      "body": "The orange galaxies bunched together on one side of the image are not part of the cluster. They are much farther away, and their light has been bent and magnified on its way to Webb. That distortion is what gives the image its funhouse-mirror look."
+    },
+    {
+      "heading": "How Gravitational Lensing Works",
+      "body": "The effect is called gravitational lensing. It happens when the enormous mass of a foreground object, such as a galaxy cluster, bends and magnifies the light from a more distant object in the background. In this way, the cluster acts like a natural lens, helping reveal galaxies that would otherwise be much harder to see."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/image-article/cosmic-house-of-mirrors/",
+    "original_title": "Cosmic House of Mirrors"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/55558916046-731625cbe5-o.jpg",
+  "published_at": "2026-10-09T13:57:24Z",
+  "generated_at": "2026-10-11T02:26:28+00:00",
+  "model": "claude-sonnet-5-5"
+}

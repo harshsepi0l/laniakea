@@ -1,0 +1,32 @@
+{
+  "id": 40305,
+  "title": "NASA-Backed SSPICY Spacecraft to Inspect Defunct Satellites in Orbit",
+  "summary": "NASA's SSPICY mission launched Oct. 1 to test an autonomous spacecraft that will inspect inactive satellites and rocket bodies up close. The technologies could one day enable in-orbit repairs and help reduce dangerous space debris.",
+  "sections": [
+    {
+      "heading": "A Close Look at Dead Satellites",
+      "body": "The Small Spacecraft Propulsion and Inspection Capability mission, called SSPICY, launched Oct. 1 from Vandenberg Space Force Base in California. It carries an Otter spacecraft that will approach up to four inoperable U.S.-origin objects in low Earth orbit, such as old satellites and rocket bodies. It is a technology demonstration, meaning its goal is to prove out new capabilities rather than deliver a service."
+    },
+    {
+      "heading": "Autonomous Inspections Begin in 2027",
+      "body": "In early 2027, the Otter spacecraft, built by Starfish Space, will move within hundreds of yards of each object. It will rely on autonomous guidance and control software that needs minimal input from ground controllers. Computer vision and sensors let the software make real-time navigation decisions as it nears each target, while the spacecraft gathers details like spin rate, orientation, and surface condition."
+    },
+    {
+      "heading": "Testing New Technologies Together",
+      "body": "An electric propulsion system will carry SSPICY from one object to the next. An articulating robotic boom will test pointing the spacecraft's thrusters for precise maneuvering between different orbits. This is the first time these technologies will be tested together as an integrated system. The spacecraft will not touch or dock with any satellite."
+    },
+    {
+      "heading": "Why Orbital Safety Matters",
+      "body": "Inactive satellites and rocket bodies can break apart or collide, creating orbital debris that ranges from large fragments to small particles. With thousands of satellites launched each year for communications, weather forecasting, navigation, and other services, keeping near-Earth space safe is increasingly critical. The technologies tested here could one day support missions that service or repair objects in orbit, or safely pull them into Earth's atmosphere for disposal. NASA's Small Spacecraft and Distributed Systems program funds and manages the demonstration, and Starfish Space operates the Otter 24C spacecraft."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/centers-and-facilities/ames/nasas-sspicy-mission-to-demonstrate-in-space-inspection-technologies/",
+    "original_title": "NASA’s SSPICY Mission to Demonstrate In-Space Inspection Technologies"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/otter-2.png",
+  "published_at": "2026-10-08T18:56:25Z",
+  "generated_at": "2026-10-11T02:32:20+00:00",
+  "model": "claude-sonnet-5-5"
+}

@@ -1,0 +1,32 @@
+{
+  "id": 40312,
+  "title": "Satellite Images Show Widespread Flooding Across Thailand",
+  "summary": "Persistent heavy rain in late September and early October 2026 flooded low-lying areas across Thailand, and NASA satellite images show the impact in Prachin Buri province. The floods have affected millions of people and damaged large areas of farmland.",
+  "sections": [
+    {
+      "heading": "Monsoon Rains Turn Severe",
+      "body": "September is the heart of Thailand's monsoon season, when afternoon rains and thunderstorms are common. But in late September and early October 2026, persistent heavy rain with intense downpours left low-lying areas across the country under sustained flooding."
+    },
+    {
+      "heading": "A View From Space",
+      "body": "Landsat satellites, operated by NASA and the U.S. Geological Survey, imaged Prachin Buri province on October 2, 2026, showing land along the Bang Pakong River, farms, and aquaculture facilities underwater. A comparison image shows the same area at the same time of year in 2025. The images use false color, which assigns unnatural colors to help separate water from vegetation and developed land, and the bright red shapes are floating solar arrays."
+    },
+    {
+      "heading": "What Fueled the Downpours",
+      "body": "Some of the flooding likely came from a low-pressure system that stalled over the area for several days in late September. It drew moisture and energy from the warm Gulf of Thailand nearby, which made the rain especially intense. Bangkok, about 100 kilometers (60 miles) to the west, received nearly 300 millimeters (11.8 inches) of rain in 48 hours, close to its September average of 344 millimeters (13.5 inches)."
+    },
+    {
+      "heading": "People and Farmland Affected",
+      "body": "Since mid-September, flooding has struck 50 provinces and affected over 4 million people, according to the International Federation of Red Cross and Red Crescent Societies. It has also caused dozens of deaths. Government agencies estimate that about 270,000 hectares (670,000 acres) of farmland, including rice fields and fruit orchards, have been damaged."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/earth/earth-observatory/floodwaters-overwhelm-thailand/",
+    "original_title": "Floodwaters Overwhelm Thailand"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/esd/eo/images/iotd/2026/floodwaters-overwhelm-thailand/thailandflooding_oli_20251007.jpg",
+  "published_at": "2026-10-09T04:01:00Z",
+  "generated_at": "2026-10-11T02:32:02+00:00",
+  "model": "claude-sonnet-5-5"
+}

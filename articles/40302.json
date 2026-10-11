@@ -1,0 +1,32 @@
+{
+  "id": 40302,
+  "title": "NASA's SpaceX Crew-12 Returns to Earth After 237 Days in Orbit",
+  "summary": "Four astronauts and cosmonauts splashed down safely in the Pacific Ocean after more than seven months aboard the International Space Station. Their research and spacewalks support future exploration of the Moon and Mars and benefit people on Earth.",
+  "sections": [
+    {
+      "heading": "Safe Splashdown Off Los Angeles",
+      "body": "NASA's SpaceX Crew-12 mission splashed down in the Pacific Ocean off the coast of Los Angeles at 8:34 a.m. PDT. The crew was NASA astronauts Jessica Meir and Jack Hathaway, ESA (European Space Agency) astronaut Sophie Adenot, and Roscosmos cosmonaut Andrey Fedyaev. Teams aboard SpaceX recovery vessels retrieved the spacecraft and crew shortly afterward. After standard medical screenings, the crew will fly to shore and then head to NASA's Johnson Space Center in Houston."
+    },
+    {
+      "heading": "A Long Journey in Orbit",
+      "body": "The crew lived and worked in space for 237 days, traveling more than 100 million miles and completing more than 3,792 orbits around Earth. They lifted off on Feb. 13 and docked with the station a day later. It was the second spaceflight for Meir and Fedyaev and the first for Hathaway and Adenot."
+    },
+    {
+      "heading": "Science for Earth and Beyond",
+      "body": "Crew-12 logged hundreds of hours of research meant to support human exploration beyond low Earth orbit and to benefit people on Earth. Their work included testing stem cell production for cell-based therapies, demonstrating on-demand IV fluid generation for future missions, and studying how the bacteria that causes pneumonia can lead to long-term heart damage. They also did nutrition research and examined how physical characteristics may affect blood flow during spaceflight. NASA says this work helps prepare for human exploration of the Moon and Mars."
+    },
+    {
+      "heading": "Spacewalk Milestones and Briefing",
+      "body": "Meir completed four spacewalks, bringing her career total to seven and placing her third all-time among NASA women, behind Peggy Whitson and Suni Williams. Adenot completed three spacewalks and became the first French woman to venture outside the orbital outpost. Meir, Hathaway, and Fedyaev will discuss the mission at a news conference at 3:30 p.m. EDT on Oct. 15 at Johnson Space Center, while Adenot will return to Europe and will not take part."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/news-release/nasas-spacex-crew-12-splashes-down-sets-briefing-to-discuss-mission/",
+    "original_title": "NASA’s SpaceX Crew‑12 Splashes Down, Sets Briefing to Discuss Mission"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/crew12splashdown1.jpg",
+  "published_at": "2026-10-08T17:02:28Z",
+  "generated_at": "2026-10-11T02:32:50+00:00",
+  "model": "claude-sonnet-5-5"
+}

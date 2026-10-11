@@ -1,0 +1,28 @@
+{
+  "id": "2026-10-10",
+  "title": "The Moon's Farside Seen by Lunar Reconnaissance Orbiter",
+  "summary": "A sharp mosaic from NASA's Lunar Reconnaissance Orbiter shows the Moon's farside, which looks rough and battered compared with the nearside. The difference is likely explained by a thicker crust on the farside.",
+  "sections": [
+    {
+      "heading": "A Side We Never See",
+      "body": "The Moon is tidally locked in synchronous rotation, meaning it always shows the same face, the nearside, to people on Earth. The farside stays hidden from our view. From lunar orbit, though, the farside can become familiar."
+    },
+    {
+      "heading": "Building the Mosaic",
+      "body": "This picture is a mosaic from the wide angle camera on the Lunar Reconnaissance Orbiter, centered on the farside. It is part of a global mosaic made from more than 15,000 images taken between November 2009 and February 2011. The highest resolution version shows features at a scale of 100 meters per pixel."
+    },
+    {
+      "heading": "Two Very Different Faces",
+      "body": "The farside looks rough and battered, which is surprising because the nearside is covered with smooth, dark plains called lunar maria. A likely explanation is that the farside crust is thicker. That would make it harder for molten material from the interior to flow to the surface and form dark, smooth maria."
+    }
+  ],
+  "source": {
+    "name": "NASA APOD",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-10-lunar-farside/",
+    "original_title": "Lunar Farside"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/farside_lro1600.jpg?w=1200&fit=clip",
+  "published_at": "2026-10-10T04:05:00Z",
+  "generated_at": "2026-10-11T02:37:21+00:00",
+  "model": "claude-sonnet-5-5"
+}

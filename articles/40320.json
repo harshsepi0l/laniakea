@@ -1,0 +1,32 @@
+{
+  "id": 40320,
+  "title": "NASA Tests New Heat Shield Materials on a Departing Cargo Ship",
+  "summary": "NASA and the University of Kentucky sent 12 small experimental capsules back to Earth inside a departing Cygnus XL cargo spacecraft to test next-generation heat shield designs. The low-cost approach gathers real flight data that could help protect crews and cargo returning from the Moon and Mars.",
+  "sections": [
+    {
+      "heading": "Turning Trash Into Test Flights",
+      "body": "When Northrop Grumman's 24th cargo resupply mission undocked from the International Space Station, it carried 12 small experimental capsules inside a Cygnus XL spacecraft packed with waste. The experiment, called KREPE-3, is the third in a series that uses the cargo ship's final moments to collect valuable data. As the vehicle harmlessly breaks apart in Earth's atmosphere, the capsules will eject and send live data to researchers via satellite signals."
+    },
+    {
+      "heading": "Student-Built Capsules and Partners",
+      "body": "University of Kentucky students designed the capsules, which carry sensors that measure temperature, pressure, motion, magnetic field, and light during re-entry. The project is a collaboration among the university, the state of Kentucky, NASA's EPSCoR program, several NASA centers, and other federal and commercial partners. NASA's David Berger said it shows the program's goal of supporting the next generation of scientists and engineers."
+    },
+    {
+      "heading": "Old and New Heat Shield Materials",
+      "body": "The capsules will test proven materials, such as the ceramic tile used on the space shuttle, alongside new options like a 3D-printed heat shield developed at NASA Johnson and Oak Ridge National Laboratory. NASA Ames is contributing MERINO, a family of materials made from carbon and phenolic fibers stitched together like felt. These coverings are more flexible, faster to produce, and less expensive than traditional ones, which makes them promising for Mars missions, where the thinner atmosphere means lower heat loads and lighter protection."
+    },
+    {
+      "heading": "New Shapes and Designs",
+      "body": "Other capsules focus on shape and design. One dual-cone capsule will check computer models against real-world data, while another is shaped like the aeroshell for NASA's Dragonfly mission to Saturn's moon Titan and will test its stability. A third is an umbrella-shaped deployable heat shield that could fold up at full scale, making it useful for delivering payloads larger than the rockets that launch them. Partners are also testing other materials, including a heat flux sensor from Germany's University of Stuttgart that measures how heat moves across a surface during re-entry."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/centers-and-facilities/ames/nasa-demonstrates-next-generation-heat-shield-technologies/",
+    "original_title": "NASA Demonstrates Next-Generation Heat Shield Technologies"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/iss075e0185943.jpg",
+  "published_at": "2026-10-09T16:59:24Z",
+  "generated_at": "2026-10-11T02:26:23+00:00",
+  "model": "claude-sonnet-5-5"
+}

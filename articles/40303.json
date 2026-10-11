@@ -1,0 +1,32 @@
+{
+  "id": 40303,
+  "title": "NASA's SPHEREx Telescope Studies a Diverse Group of Brown Dwarfs",
+  "summary": "NASA's SPHEREx space telescope analyzed 37 nearby brown dwarfs and found chemically rich atmospheres containing water, carbon dioxide, carbon monoxide, and methane. The results show that current models struggle to explain these objects, and thousands more are waiting to be studied.",
+  "sections": [
+    {
+      "heading": "Between Stars and Planets",
+      "body": "Brown dwarfs form from collapsing clouds of gas, as stars do, but they are not massive enough to sustain hydrogen fusion in their cores. They share traits with Jupiter and Saturn, yet most drift alone with no host star and are heated entirely from within. Lead author Zafar Rustamkulov described them as a bit goth, since they fade into eternity alone. Only a few dozen have been studied in detail with space-based telescopes, so much of what we know comes from theoretical models."
+    },
+    {
+      "heading": "What SPHEREx Found",
+      "body": "The study analyzed SPHEREx observations of 37 nearby brown dwarfs, covering temperatures from about 4,000 to minus 10 degrees Fahrenheit (2,200 to minus 20 degrees Celsius). The telescope measures brightness in 102 colors, from deep red to infrared, producing a spectrum, which is light spread out to show what molecules are present. These spectra revealed atmospheres with water, carbon dioxide, carbon monoxide, and methane. From orbit, SPHEREx can see wavelengths that water in Earth's atmosphere blocks from ground-based telescopes."
+    },
+    {
+      "heading": "A Side Project With Big Reach",
+      "body": "Studying brown dwarfs is something of a side project for SPHEREx, which takes about 3,600 images per day to build maps of the entire sky. Its main goals include locating hundreds of millions of galaxies to learn about the earliest moments after the big bang, and searching for the chemical ingredients of life and interstellar ice. Other observatories, including the James Webb Space Telescope and the retired Spitzer, have spotted brown dwarfs before. But SPHEREx is now imaging thousands of them for the first time across deep red and infrared wavelengths."
+    },
+    {
+      "heading": "Models Struggle With Cloudy Transitions",
+      "body": "At these wavelengths, molecules leave distinct absorption patterns in the light, and the patterns change as brown dwarfs age and cool. Some of the observed objects are in a stage where their clouds thin out and methane-rich atmospheres take over. Rustamkulov said state-of-the-art models capture the general chemical trend but struggle to match the data during these cloudy transitions, and that even brown dwarfs at the same temperature look quite distinct. Coauthor J. Davy Kirkpatrick said thousands more are being analyzed, and that the work has turned many researchers into accidental meteorologists."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/missions/spherex/nasas-spherex-telescope-sees-menagerie-of-brown-dwarfs/",
+    "original_title": "NASA’s SPHEREx Telescope Sees Menagerie of Brown Dwarfs"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/1-brown-dwarf-grid-16x9-1.jpg",
+  "published_at": "2026-10-08T18:22:48Z",
+  "generated_at": "2026-10-11T02:32:37+00:00",
+  "model": "claude-sonnet-5-5"
+}

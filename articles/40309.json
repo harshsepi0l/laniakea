@@ -1,0 +1,32 @@
+{
+  "id": 40309,
+  "title": "NASA to Preview Its Role in Japan's Martian Moons Mission",
+  "summary": "NASA will hold a media teleconference on Oct. 15 to outline its contributions to JAXA's Martian Moons eXploration mission, which is set to launch days later. The mission aims to bring back a sample from Mars's moon Phobos.",
+  "sections": [
+    {
+      "heading": "Briefing and Launch Dates",
+      "body": "NASA will host a media teleconference at 4 p.m. EDT on Thursday, Oct. 15, to preview its part in the Martian Moons eXploration (MMX) mission led by Japan's space agency, JAXA. The mission is scheduled to lift off from JAXA's Tanegashima Space Center in Japan on Monday, Oct. 19 EDT, which is Tuesday, Oct. 20 in Japan. Speakers will include NASA Planetary Science Division officials, the principal investigator for one of the instruments, and a Honeybee Robotics executive."
+    },
+    {
+      "heading": "The Journey to Phobos",
+      "body": "MMX is set to reach Mars in August 2027 and begin surveying the planet's two moons, Phobos and Deimos. After studying Phobos in detail, the spacecraft will collect a sample of its surface no earlier than December 2028. That sample is planned to arrive back on Earth in 2031."
+    },
+    {
+      "heading": "What NASA Is Contributing",
+      "body": "NASA is providing the MEGANE instrument, a gamma-ray and neutron spectrometer, which is a device that detects particles and radiation to reveal what a surface is made of. It is also supplying the spacecraft's surface sampler mechanism, plus communications and navigation support from its Deep Space Network. The agency is also funding U.S. scientists on the MMX science team."
+    },
+    {
+      "heading": "Who Built the Hardware",
+      "body": "Johns Hopkins Applied Physics Laboratory developed MEGANE. Honeybee Robotics, a Blue Origin company, built the pneumatic sampler mechanism, which is the tool that collects the surface material. NASA's contributions were funded through its Discovery Program, which offers frequent flight opportunities for focused planetary science investigations and is managed by Marshall Space Flight Center."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/news-release/nasa-briefing-to-highlight-contributions-to-martian-moons-mission/",
+    "original_title": "NASA Briefing to Highlight Contributions to Martian Moons Mission"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2023/04/mmx-mars-mission.jpg",
+  "published_at": "2026-10-08T20:22:12Z",
+  "generated_at": "2026-10-11T02:32:08+00:00",
+  "model": "claude-sonnet-5-5"
+}

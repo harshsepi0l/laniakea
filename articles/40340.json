@@ -1,0 +1,32 @@
+{
+  "id": 40340,
+  "title": "ESA Astronaut Sophie Adenot Returns to Europe After Record-Setting Space Station Mission",
+  "summary": "ESA astronaut Sophie Adenot landed in Cologne, Germany, on 10 October after 237 days aboard the International Space Station. Her εpsilon mission set a new European record for the longest single spaceflight and showcased Europe's growing role in human spaceflight.",
+  "sections": [
+    {
+      "heading": "The Journey Home",
+      "body": "Sophie Adenot returned to Earth with the Crew-12 team, which included NASA astronauts Jessica Meir and Jack Hathaway and Roscosmos cosmonaut Andrei Fedyaev. They undocked from the Station on 7 October and splashed down on 8 October after a return trip of 27 hours and 29 minutes. After medical checks and a flight to Houston, Sophie boarded a French Air and Space Force plane and landed at ESA's European Astronaut Centre in Cologne on 10 October, where family, friends and colleagues welcomed her."
+    },
+    {
+      "heading": "A European Record",
+      "body": "Sophie spent 237 days, 5 hours and 18 minutes in space after launching on 13 February 2026. That beat the previous European record for the longest single spaceflight, held by Luca Parmitano, by more than 35 days, and made Crew-12 the longest SpaceX Dragon mission so far. She is also the first French woman to do a spacewalk, completing three in 14 days for a total of 19 hours and 42 minutes outside the Station."
+    },
+    {
+      "heading": "Science and Technology Work",
+      "body": "Sophie carried out European experiments in areas such as health research, materials science, biology, fluid physics and radiation physics. She also helped test technologies for future exploration, including a new European exercise device called E4D and metal 3D printing in orbit. She spent around 218 hours on 35 European payloads and finished all the ESA experiments assigned to her, along with all the εpsilon experiments proposed by the French space agency CNES."
+    },
+    {
+      "heading": "Recovery and Outreach",
+      "body": "Over the next two to three weeks, Sophie will readjust to Earth's gravity and take part in data collection at :envihab, a German Aerospace Center facility next to the astronaut centre. Throughout the mission, she shared life in orbit with more than 1.1 million followers, and her posts drew over 403 million views. She also inspired more than 290,000 students through school experiments and challenges, and took part in more than 40 live events."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/epsilon/ESA_astronaut_Sophie_Adenot_returns_from_her_first_mission_to_the_International_Space_Station",
+    "original_title": "ESA astronaut Sophie Adenot returns from her first mission to the International Space Station"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2026/10/sophie_is_back_in_europe2/27568712-2-eng-GB/Sophie_is_back_in_Europe_card_full.jpg",
+  "published_at": "2026-10-10T09:01:00Z",
+  "generated_at": "2026-10-11T02:26:06+00:00",
+  "model": "claude-sonnet-5-5"
+}

@@ -1,0 +1,32 @@
+{
+  "id": 40300,
+  "title": "NASA and Energy Department Sign Agreement to Advance Nuclear Power for Space",
+  "summary": "NASA and the U.S. Department of Energy signed a Memorandum of Understanding to work together on nuclear power and propulsion for space. The partnership supports planned missions to the Moon, Mars and Saturn's moon Titan that need far more energy than current systems can reliably supply.",
+  "sections": [
+    {
+      "heading": "A New Nuclear Partnership",
+      "body": "NASA and the Department of Energy signed a Memorandum of Understanding titled \"Accelerating American Leadership in Space Nuclear Power and Propulsion.\" It sets up a framework for the agencies to collaborate from start to finish, covering research, fuel production, testing, launch integration and operations. NASA Administrator Jared Isaacman and Energy Secretary Chris Wright signed it at the Science: A Golden Age Summit in Washington, and it takes effect Nov. 1. Both agencies call safety the central pillar of the effort."
+    },
+    {
+      "heading": "Reactors for the Moon",
+      "body": "A December 2025 Executive Order directs NASA to develop a launch-ready lunar surface reactor by 2030. A reactor of this kind uses nuclear fission, which splits atoms to release energy. Lunar Reactor-1 is meant to power the future Moon Base through lunar darkness and shadow, supplying habitats, communications, instruments, rovers and other critical infrastructure. Nuclear power is also described as essential for the demanding energy needs of future Mars missions."
+    },
+    {
+      "heading": "Space Reactor-1 Freedom",
+      "body": "NASA's Space Reactor-1 Freedom is set to launch in 2028. That launch would move nuclear propulsion from laboratory research to real operational use in deep space. NASA says this milestone paves the way for Lunar Reactor-1. Together the two programs are meant to form the foundation of a strong domestic nuclear-space industrial base."
+    },
+    {
+      "heading": "Radioisotope Power and Heaters",
+      "body": "NASA also continues to use radioisotope power systems, which make power and heat from the natural decay of radioactive material. The Dragonfly mission, scheduled to launch in 2028 for Saturn's moon Titan, will use a Multi-Mission Radioisotope Thermoelectric Generator and 24 Light Weight Radioisotope Heater Units for its car-sized rotorcraft. NASA and DOE also plan to give ESA's Rosalind Franklin Mars rover 24 similar heater units to keep its instruments warm in the extreme Martian cold."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/news-release/nasa-energy-department-advance-new-era-of-nuclear-powered-exploration/",
+    "original_title": "NASA, Energy Department Advance New Era of Nuclear-Powered Exploration"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/nasa-doe-mou-release-smaller-image-oct-8.jpg",
+  "published_at": "2026-10-08T15:46:25Z",
+  "generated_at": "2026-10-11T02:33:02+00:00",
+  "model": "claude-sonnet-5-5"
+}

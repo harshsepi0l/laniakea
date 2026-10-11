@@ -1,0 +1,28 @@
+{
+  "id": 40306,
+  "title": "Crew-12 Astronauts Splash Down in the Pacific After Nearly Eight Months in Space",
+  "summary": "The four members of NASA's SpaceX Crew-12 mission returned to Earth on Oct. 8, 2026, after nearly eight months aboard the International Space Station. A NASA photograph shows their spacecraft moments before it touched down in the ocean.",
+  "sections": [
+    {
+      "heading": "Splashdown Off California",
+      "body": "SpaceX's Crew Dragon Freedom spacecraft landed in the Pacific Ocean off the coast of California on Oct. 8, 2026. This kind of return is called a splashdown because the capsule comes down in water rather than on land. A photograph taken by NASA's Keegan Barber captures the spacecraft just moments before it hit the water."
+    },
+    {
+      "heading": "Four Crew Members Aboard",
+      "body": "Crew-12 carried four people home. NASA astronauts Jessica Meir and Jack Hathaway were joined by Sophie Adenot, an astronaut with ESA (the European Space Agency), and Andrey Fedyaev, a cosmonaut with Roscosmos. Cosmonaut is the title used for Roscosmos's space travelers. The crew represented three different space organizations."
+    },
+    {
+      "heading": "Months on the Space Station",
+      "body": "The four spent nearly eight months aboard the International Space Station, the orbiting laboratory where crews live and work in space. Their return brings the Crew-12 mission to a close. NASA has also published more photos from the splashdown for anyone who wants a closer look."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/image-article/crew-12-returns-to-earth/",
+    "original_title": "Crew-12 Returns to Earth"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2026/10/55577377940-a59482db3e-o.jpg",
+  "published_at": "2026-10-08T18:52:27Z",
+  "generated_at": "2026-10-11T02:32:29+00:00",
+  "model": "claude-sonnet-5-5"
+}

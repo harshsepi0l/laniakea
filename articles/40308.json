@@ -1,0 +1,32 @@
+{
+  "id": 40308,
+  "title": "NASA Launches Peer Review and Fellowship Initiatives",
+  "summary": "NASA announced two new initiatives, one to improve how it evaluates scientific proposals and one to fund doctoral researchers working with advanced AI-related skills. They were unveiled alongside a White House science summit and aim to strengthen the quality and pace of NASA research.",
+  "sections": [
+    {
+      "heading": "Two New Initiatives",
+      "body": "NASA is launching two science and technology programs meant to deepen scientific understanding and speed up innovation. They were announced alongside the White House Office of Science and Technology Policy's \"Science: A Golden Age Summit\" in Washington. One program focuses on peer review, the process of having experts evaluate research, and the other focuses on fellowship researchers."
+    },
+    {
+      "heading": "Reworking How Science Is Judged",
+      "body": "NASA will set up a coordinated metascience initiative within its Science Mission Directorate. Metascience means studying how science itself is done, and here the goal is to make the agency's practices more reliable, efficient, transparent, and productive. As part of this, NASA is expanding dual anonymous peer review, which is meant to ensure proposals are judged solely on their scientific merit. The agency says this supports fairness and unconventional ideas, and it began as a pilot during the first Trump Administration."
+    },
+    {
+      "heading": "Genesis Mission Fellowships",
+      "body": "NASA will support 10 Genesis Mission Fellows, who are accelerated doctoral students skilled in both super intelligence (SI) and science or engineering. They will work directly on NASA mission areas and conduct research at NASA laboratories, with a focus on SI-enabled scientific discovery. The fellowships are modeled on NASA's Future Investigators in NASA Earth and Space Science and Technology program."
+    },
+    {
+      "heading": "Leaders Frame a Golden Age",
+      "body": "NASA Administrator Jared Isaacman and OSTP Director Michael Kratsios are set to discuss the initiatives in a fireside chat at the summit. Isaacman said NASA is building on a legacy of bold ideas by creating new opportunities, experimenting with how it evaluates the best ideas, and investing in young researchers. The programs support the vision outlined in the July report to the President, Science: A New Golden Age."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/news-release/nasa-announces-bold-science-initiatives-for-americas-golden-age-summit/",
+    "original_title": "NASA Announces Bold Science Initiatives for America’s Golden Age Summit"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2022/02/nasa_meatball_large.jpg",
+  "published_at": "2026-10-08T19:40:00Z",
+  "generated_at": "2026-10-11T02:32:14+00:00",
+  "model": "claude-sonnet-5-5"
+}

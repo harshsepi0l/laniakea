@@ -1,0 +1,32 @@
+{
+  "id": 40315,
+  "title": "ESA Week in Images: 5 to 9 October 2026",
+  "summary": "ESA's weekly photo roundup covered Earth views, deep-space sightings, spacecraft hardware testing and a few people-focused announcements. It offers a quick look at the range of work happening across the agency.",
+  "sections": [
+    {
+      "heading": "Views of Earth",
+      "body": "Sentinel-3C imaged Italy and the area beyond it this week. A Copernicus Sentinel-2 image acquired on 5 April 2026 shows Etosha National Park in northern Namibia. Both are satellites in Europe's Earth-observation fleet."
+    },
+    {
+      "heading": "Sightings Across the Solar System",
+      "body": "Hera sent back its first glimpse of Didymos, its destination. Mars Express captured the Arsia Mons Elongated Cloud, and Webb showed commotion from the stellar jets of a nebula, a glowing cloud of gas and dust. Trisat-S also took an image of the Sun."
+    },
+    {
+      "heading": "Hardware Under Test",
+      "body": "Lunar Pathfinder was shown during its integration and testing campaign at SSTL in the United Kingdom. LandCam-X was pictured as it was integrated onto the Griffin-1 lander, and MPAc went through a vibration test. Engineers also followed a rover's moves in the desert, and images showed the three terminals of ESA's UWB technology demonstrator."
+    },
+    {
+      "heading": "People and New Projects",
+      "body": "Géraldine Naja was pictured with the WIA-Europe award. ESA and Pi School also presented EVE."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/About_Us/Week_in_images/Week_in_images_05-09_October_2026",
+    "original_title": "Week in images: 05-09 October 2026"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2026/10/webb_captures_commotion_from_nebula_s_stellar_jets/27545931-4-eng-GB/Webb_captures_commotion_from_nebula_s_stellar_jets_card_full.jpg",
+  "published_at": "2026-10-09T13:15:00Z",
+  "generated_at": "2026-10-11T02:26:37+00:00",
+  "model": "claude-sonnet-5-5"
+}

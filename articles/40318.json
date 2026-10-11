@@ -1,0 +1,32 @@
+{
+  "id": 40318,
+  "title": "ESA's Fluid Science Laboratory Retires After 18 Years on the Space Station",
+  "summary": "Astronauts on the International Space Station began decommissioning ESA's Fluid Science Laboratory on 9 October, ending more than 18 years of microgravity research. Its retirement frees up space in the Columbus laboratory for new hardware, starting with the ESA X-Ray Facility.",
+  "sections": [
+    {
+      "heading": "Eighteen years of fluid research",
+      "body": "ESA's Fluid Science Laboratory (FSL) launched with the Columbus laboratory in February 2008 and studied how fluids, foams, emulsions and granular materials behave in microgravity. It completed over 101 000 orbits, supported 18 scientific experiments and logged more than 42 000 hours of operations. Although it was designed to last 10 years, it stayed productive for nearly twice that long thanks to the international teams who operated and maintained it."
+    },
+    {
+      "heading": "Physics without gravity",
+      "body": "In space, gravity-driven effects such as buoyancy (the upward push in a fluid) and sedimentation (the settling of particles) are removed, so scientists can observe the fundamental physics of liquids, gases and soft matter. Experiments in FSL included GEOFLOW, which modelled processes similar to those deep inside Earth, RUBI on combustion and heat transfer, FOAM-C on liquid foams, COMPGRAN on granular materials, and more recently PASTA on particle transport and aggregation. The findings are relevant to industries from manufacturing to food production."
+    },
+    {
+      "heading": "The final experiments",
+      "body": "FSL's last science activities ended in July 2026, with one of its final programmes being PASTA-3, which studied emulsions. Emulsions are mixtures of liquids that do not naturally mix, such as oil and water, and removing gravity helps researchers understand what keeps them stable. The last PASTA-3 samples reached the station on the Cygnus NG-23 spacecraft in September 2025, and ESA astronaut Sophie Adenot helped complete one of the lab's final crew-assisted activities during her εpsilon mission."
+    },
+    {
+      "heading": "Teamwork and a lasting legacy",
+      "body": "French ESA astronaut Léopold Eyharts carried out FSL's first activation, and for over a decade the Belgian User Support and Operations Centre (B.USOC) coordinated its daily science operations. In the coming months, astronauts will prepare the facility for disposal on a future cargo spacecraft, which will end its journey with a destructive reentry into Earth's atmosphere. The freed space in Columbus will go first to the ESA X-Ray Facility for materials science, while the knowledge gained from FSL will keep supporting future research in low Earth orbit and beyond."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/Farewell_to_the_Fluid_Science_Laboratory_after_18_years_in_orbit",
+    "original_title": "Farewell to the Fluid Science Laboratory after 18 years in orbit"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2026/10/installing_pasta-3_in_fsl/27567798-1-eng-GB/Installing_PASTA-3_in_FSL_card_full.jpg",
+  "published_at": "2026-10-09T10:00:00Z",
+  "generated_at": "2026-10-11T02:26:47+00:00",
+  "model": "claude-sonnet-5-5"
+}

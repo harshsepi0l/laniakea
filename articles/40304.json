@@ -1,0 +1,32 @@
+{
+  "id": 40304,
+  "title": "Webb Finds Host Galaxy of Most Distant Fast Radio Burst",
+  "summary": "Astronomers used NASA's James Webb Space Telescope to locate the galaxy hosting the farthest fast radio burst seen so far, a small, young dwarf galaxy. The result points away from neutron star mergers and toward young magnetars as the source of such bursts.",
+  "sections": [
+    {
+      "heading": "A Record-Setting Radio Flash",
+      "body": "Fast radio bursts are millisecond-long flashes of radio emission from the distant universe, first discovered in 2007. Their origin is still uncertain, partly because most are seen only once. The MeerTRAP team detected FRB 20240304B with the MeerKAT telescope on March 4, 2024, and its radio data hinted that it might be the most distant one yet."
+    },
+    {
+      "heading": "Webb Confirms the Distance",
+      "body": "The burst's position was known precisely, but the world's largest ground-based telescopes could not see a galaxy there, so the team turned to Webb. Its NIRCam instrument spotted a galaxy at the right spot, and its NIRSpec instrument measured a redshift (a stretching of light that reveals distance and look-back time) of 2.148. That corresponds to about 3 billion years after the big bang, much earlier than the vast majority of known bursts."
+    },
+    {
+      "heading": "A Surprising Dwarf Host",
+      "body": "Most burst host galaxies are massive and star-forming, but this one was about 1,000 times less massive than expected. It was a small dwarf galaxy that was still actively forming stars, during the era called cosmic noon when star formation peaked. Most of its stars may have formed within just 30 million years, which matters because one theory says bursts come from merging neutron stars, a process expected to take billions of years. A second theory says a young, highly magnetic neutron star called a magnetar could produce a burst soon after its parent star explodes, which fits a young galaxy better, and lead author Manisha Caleb said a merger origin is very unlikely."
+    },
+    {
+      "heading": "A Flashlight Through the Cosmic Web",
+      "body": "Because a burst's signal carries an imprint of everything it passes through, it can trace the invisible matter known as the cosmic web. This one revealed a previously unknown galaxy cluster at a redshift of 0.3 and the nearby Virgo Cluster. The team expects MeerKAT could find several bursts per year beyond a redshift of 1.0, with Webb essential for studying their host galaxies."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/missions/webb/webb-measures-distance-to-farthest-fast-radio-burst-suggesting-origin/",
+    "original_title": "Webb Measures Distance to Farthest Fast Radio Burst, Suggesting Origin"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2026/10/STScI-01KKCJGBWX6TE4ABRTFWE9B8SQ.jpg",
+  "published_at": "2026-10-08T18:00:00Z",
+  "generated_at": "2026-10-11T02:32:44+00:00",
+  "model": "claude-sonnet-5-5"
+}

@@ -1,0 +1,32 @@
+{
+  "id": 40321,
+  "title": "NASA Releases Final Call for Commercial Space Station Proposals",
+  "summary": "NASA has issued its final Request for Proposals asking U.S. companies to submit plans for commercial space stations in low Earth orbit. The effort aims to keep an American presence in orbit after the International Space Station retires.",
+  "sections": [
+    {
+      "heading": "A Final Call to Industry",
+      "body": "On Friday, NASA released its final Request for Proposals, a formal document inviting companies to submit plans for the next generation of commercial space stations. These stations would operate in low Earth orbit, the region of space close to our planet where the International Space Station circles today. NASA says the step supports American leadership in space and a lasting presence in orbit after the station retires."
+    },
+    {
+      "heading": "Why NASA Wants Commercial Stations",
+      "body": "NASA Administrator Jared Isaacman said the agency will keep needing a place to conduct research, develop technologies, train crews, and prepare for missions to the Moon and Mars. He said commercial stations may provide that capability while creating new opportunities for American industry. It would also let NASA focus more of its resources on what he called the near-impossible missions ahead."
+    },
+    {
+      "heading": "Listening to Industry First",
+      "body": "NASA says it has regularly engaged private industry on its future in low Earth orbit, building on its Ignition event earlier this year. In March it published two Requests for Information to gather views on orbital destinations and transportation. A draft Request for Proposals followed in July, along with an industry day and one-on-one meetings so companies could comment on the planned approach. Isaacman stressed that the economics have to work, and NASA wants credible plans, strong technical execution, and companies ready to invest and build their own customers and markets."
+    },
+    {
+      "heading": "Contracts and Timeline",
+      "body": "Proposals are due Tuesday, Dec. 8, and NASA expects to award contracts in spring 2027. Companies would design, build, test, certify, and operate stations that offer both destination and transportation services for human spaceflight. NASA plans multi-award contracts with a firm fixed price, meaning the price is set in advance, and it intends to select two or more contractors for early development. A competitive task order would then cover final design, testing, evaluation, certification, and services from one or more of them."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/news-release/nasa-seeks-us-industry-plans-for-commercial-space-stations/",
+    "original_title": "NASA Seeks US Industry Plans for Commercial Space Stations"
+  },
+  "image_url": "https://www.nasa.gov/wp-content/uploads/2022/02/nasa_meatball_large.jpg",
+  "published_at": "2026-10-09T18:11:44Z",
+  "generated_at": "2026-10-11T02:26:16+00:00",
+  "model": "claude-sonnet-5-5"
+}

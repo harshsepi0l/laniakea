@@ -1,0 +1,32 @@
+{
+  "id": 40311,
+  "title": "Stickney Crater: The Giant Scar on Mars' Moon Phobos",
+  "summary": "NASA's Astronomy Picture of the Day shows an enhanced-color view of Stickney Crater, the largest crater on Phobos, a moon of Mars. The crater is so big that its impact nearly broke the small moon apart, and its surface still holds puzzles for scientists.",
+  "sections": [
+    {
+      "heading": "A Crater With a Namesake",
+      "body": "Stickney Crater is the largest crater on Phobos, one of the two moons of Mars. It is named for Chloe Angeline Stickney Hall, a mathematician who was married to astronomer Asaph Hall. Asaph Hall discovered both of the Red Planet's moons in 1877."
+    },
+    {
+      "heading": "Nearly Shattering a Moon",
+      "body": "Stickney stretches over 9 kilometers across, which is nearly half the width of Phobos itself. The impact that carved it out was so powerful that it likely came close to breaking the tiny moon apart."
+    },
+    {
+      "heading": "Slides and Fresh Surfaces",
+      "body": "This enhanced-color image was captured by the HiRISE camera aboard the Mars Reconnaissance Orbiter in March 2008, when the spacecraft passed within about six thousand kilometers of Phobos. Phobos is an asteroid-like body with surface gravity less than 1/1000th of Earth's, yet streaks inside the crater walls suggest loose material slid downhill over time. Light bluish areas near the rim could mark a relatively freshly exposed surface."
+    },
+    {
+      "heading": "The Mystery of the Grooves",
+      "body": "Curious grooves run along the surface of Phobos, and their origin is still unclear. They may be linked to tidal stresses, which are stretching and squeezing forces felt by a moon that orbits very close to its planet. They could also be related to the crater-forming impact itself."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-9-stickney-crater/",
+    "original_title": "APOD: 2026 October 9 – Stickney Crater"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/PSP_007769_9010_IRB_Stickney.jpg",
+  "published_at": "2026-10-09T04:05:00Z",
+  "generated_at": "2026-10-11T02:26:58+00:00",
+  "model": "claude-sonnet-5-5"
+}

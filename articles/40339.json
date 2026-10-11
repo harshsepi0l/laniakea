@@ -1,0 +1,32 @@
+{
+  "id": 40339,
+  "title": "A Sharp View of the Moon's Farside",
+  "summary": "NASA's Astronomy Picture of the Day shows a detailed mosaic of the Moon's farside, built from Lunar Reconnaissance Orbiter images. It highlights how different the hidden hemisphere looks from the side we see, and a likely reason why.",
+  "sections": [
+    {
+      "heading": "Why We See One Side",
+      "body": "The Moon is tidally locked in synchronous rotation, which means it always shows the same face, called the nearside, to people on Earth. The other hemisphere, the farside, stays hidden from our view. Only from lunar orbit can the farside become familiar."
+    },
+    {
+      "heading": "A Mosaic From Orbit",
+      "body": "This sharp image is a mosaic made with the wide angle camera on the Lunar Reconnaissance Orbiter, centered on the farside. It is part of a global mosaic built from more than 15,000 images taken between November 2009 and February 2011. The highest resolution version shows features at a scale of 100 meters per pixel."
+    },
+    {
+      "heading": "Two Very Different Faces",
+      "body": "The farside looks rough and battered, which is surprising next to the nearside. The nearside is covered with smooth, dark plains called lunar maria. The contrast shows that the two halves of the Moon have very different surfaces."
+    },
+    {
+      "heading": "A Thicker Crust Explanation",
+      "body": "A likely explanation is that the crust on the farside is thicker. A thicker crust would make it harder for molten material from the interior to flow up to the surface. That would explain why the farside has few of the dark, smooth maria that mark the nearside."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-10-lunar-farside/",
+    "original_title": "APOD: 2026 October 10 – Lunar Farside"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/farside_lro1600.jpg",
+  "published_at": "2026-10-10T04:05:00Z",
+  "generated_at": "2026-10-11T02:26:11+00:00",
+  "model": "claude-sonnet-5-5"
+}

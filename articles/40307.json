@@ -1,0 +1,32 @@
+{
+  "id": 40307,
+  "title": "ESA Astronaut Sophie Adenot Splashes Down After Record European Spaceflight",
+  "summary": "ESA astronaut Sophie Adenot returned to Earth with Crew-12, splashing down off California on 8 October 2026 after the longest single spaceflight by a European. Her εpsilon mission also included a series of spacewalks and a wide range of research.",
+  "sections": [
+    {
+      "heading": "Splashdown Off California",
+      "body": "Sophie Adenot splashed down near Los Angeles at 15:34 GMT on 8 October 2026 aboard the Dragon Freedom spacecraft. She flew with NASA astronauts Jessica Meir and Jack Hathaway and Roscosmos cosmonaut Andrei Fedyaev, who undocked from the International Space Station on 7 October. The trip home took 27 hours and 29 minutes."
+    },
+    {
+      "heading": "Slowing Down for Landing",
+      "body": "After re-entering the atmosphere, the capsule slowed from around 28 000 km/h to about 500 km/h. Drogue chutes, small parachutes that stabilise and slow the capsule, opened at about 5500 m, and the four main chutes followed roughly a minute later. Fast boat teams reached Dragon within minutes for safety checks, and the SpaceX recovery vessel Shannon lifted it aboard so the crew could be helped out. Sophie was the third to exit, smiling and celebrating."
+    },
+    {
+      "heading": "The Journey Back to Europe",
+      "body": "After initial medical checks on the recovery vessel, the crew will travel to shore by helicopter and board a NASA plane to Ellington Field in Houston for their first post-flight activities. From there, Sophie will fly to ESA's European Astronaut Centre in Cologne, Germany."
+    },
+    {
+      "heading": "A Record-Setting Mission",
+      "body": "Launched on 13 February 2026 from Florida, Sophie spent 237 days, 5 hours and 18 minutes in space. That set a new European record for the longest single spaceflight, beating Luca Parmitano's previous record by more than 35 days. She also became the first French woman to do a spacewalk, completing three in 14 days for a total of 19 hours and 42 minutes outside the Station. Her work included European experiments in health, materials science and biology, as well as tests of a new exercise device and in-orbit metal 3D printing for future exploration."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/epsilon/Splashdown_confirmed_for_Sophie_Adenot",
+    "original_title": "Splashdown confirmed for Sophie Adenot"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2026/10/crew-12_returning_back_to_earth/27565951-1-eng-GB/Crew-12_returning_back_to_Earth_card_full.jpg",
+  "published_at": "2026-10-08T16:51:00Z",
+  "generated_at": "2026-10-11T02:32:55+00:00",
+  "model": "claude-sonnet-5-5"
+}
