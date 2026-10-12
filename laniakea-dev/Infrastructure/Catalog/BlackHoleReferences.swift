@@ -60,7 +60,7 @@ enum BlackHoleReferences {
     ///   dormant 33 solar-mass black hole in pre-release Gaia astrometry".
     static let gaiaMasses: [Int: Value] = [
         4373465352415301632: Value(value: 9.62, plus: 0.18, minus: 0.18, citation: "El-Badry et al. 2023, MNRAS 518, 1057"),
-        5870569352746779008: Value(value: 8.94, plus: 0.34, minus: 0.34, citation: "El-Badry et al. 2023, MNRAS 521, 4323"),
+        5870569352746779008: Value(value: 8.9, plus: 0.3, minus: 0.3, citation: "El-Badry et al. 2023, MNRAS 521, 4323 (abstract)"),
         4318465066420528000: Value(value: 32.70, plus: 0.82, minus: 0.82, citation: "Gaia Collaboration, Panuzzo et al. 2024, A&A 686, L2"),
     ]
 
