@@ -16,7 +16,9 @@ struct TAPClient {
 
     typealias Row = [String: String]
 
-    func query(_ adql: String) async throws -> [Row] {
+    /// `timeout` is how long to wait for an answer. Lookups that only add extras (names, types)
+    /// use a short one, so a slow service can't hold up a whole map.
+    func query(_ adql: String, timeout: TimeInterval = 60) async throws -> [Row] {
         var request = URLRequest(url: syncURL)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -27,7 +29,7 @@ struct TAPClient {
         form.queryItems = params.map { URLQueryItem(name: $0.0, value: $0.1) }
         // URLComponents leaves "+" alone, which a form body would read as a space.
         request.httpBody = form.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B").data(using: .utf8)
-        request.timeoutInterval = 60
+        request.timeoutInterval = timeout
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200,

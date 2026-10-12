@@ -33,7 +33,7 @@ extension CosmicCatalog: BlackHoleRepo {
     private func sagittariusAStar() async throws -> BlackHole {
         let rows = try await TAPClient.simbad.query("""
             SELECT b.ra, b.dec FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE i.id = 'NAME Sgr A*'
-            """)
+            """, timeout: 25)
         guard let row = rows.first, let ra = row.double("ra"), let dec = row.double("dec") else {
             throw CatalogError.unreadable("Sagittarius A*'s position")
         }
@@ -149,10 +149,10 @@ extension CosmicCatalog: BlackHoleRepo {
         let list = ids.map(String.init).joined(separator: ",")
         async let orbitsTask = TAPClient.gaia.query("""
             SELECT source_id, parallax, parallax_error FROM gaiadr3.nss_two_body_orbit WHERE source_id IN (\(list))
-            """)
+            """, timeout: 25)
         async let sourcesTask = TAPClient.gaia.query("""
             SELECT source_id, ra, dec FROM gaiadr3.gaia_source WHERE source_id IN (\(list))
-            """)
+            """, timeout: 25)
         let (orbits, sources) = try await (orbitsTask, sourcesTask)
         var parallaxes: [Int: (Double, Double)] = [:]
         for row in orbits {
@@ -194,7 +194,7 @@ extension CosmicCatalog: BlackHoleRepo {
     private func cygnusX1() async throws -> BlackHole? {
         let rows = try await TAPClient.simbad.query("""
             SELECT b.ra, b.dec, b.plx_value, b.plx_err, b.sp_type FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE i.id = 'HD 226868'
-            """)
+            """, timeout: 25)
         guard let row = rows.first, let ra = row.double("ra"), let dec = row.double("dec") else { return nil }
         let mass = BlackHoleReferences.cygX1Mass
         var hole = BlackHole(id: "cyg-x-1", name: "Cygnus X-1", aliases: ["Cyg X-1", "HD 226868", "V1357 Cyg"],

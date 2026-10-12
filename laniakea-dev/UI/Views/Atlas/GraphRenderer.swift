@@ -54,6 +54,8 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
     private var regionQuad: RegionQuadData?
 
     private struct Key: Equatable {
+        /// So objects added after a map first shows (black holes) get drawn.
+        let nodeCount: Int
         let visible: [Bool]?
         let selected: Int?
         let dark: Bool
@@ -120,7 +122,7 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
             }
         }
         clockChanged()
-        let newKey = Key(visible: content.visible, selected: content.selected, dark: content.dark,
+        let newKey = Key(nodeCount: content.scene.nodes.count, visible: content.visible, selected: content.selected, dark: content.dark,
                          hasRegionImage: content.regionImage != nil)
         guard newKey != key, let device else { return }
         key = newKey
