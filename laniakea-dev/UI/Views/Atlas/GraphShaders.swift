@@ -1,7 +1,7 @@
 import Metal
 
-/// Atlas's map shaders, compiled by the app the first time a map appears (and kept), so building
-/// the app needs no Metal toolchain.
+/// The map shaders for Atlas and the sky view, compiled by the app the first time either appears
+/// (and kept), so building the app needs no Metal toolchain.
 enum GraphShaders {
     /// The compiled library, shared by every map.
     static func library(device: MTLDevice) -> MTLLibrary? {
@@ -198,6 +198,60 @@ fragment float4 regionFragment(RegionOut in [[stage_in]],
     constexpr sampler linear(filter::linear, address::clamp_to_edge);
     float alpha = quad.color.a * mask.sample(linear, in.uv).a;
     return float4(quad.color.rgb * alpha, alpha);
+}
+
+// MARK: Sky view stars
+
+// The naked-eye stars over the camera. Each star's J2000 direction is uploaded once; one matrix a
+// frame turns them to the local sky and into the camera's view, and a pinhole projection with
+// the camera's focal length puts them on screen.
+
+struct SkyUniforms {
+    float4x4 j2000ToView;     // rows: screen right, screen up, the way the camera looks
+    float2 viewport;          // drawable size in pixels
+    float2 screen;            // drawable size in points
+    float pixelsPerPoint;
+    float focal;              // points, zoom included
+};
+
+struct SkyStar {
+    float4 color;
+    float3 direction;         // J2000 unit vector
+    float radius;             // points
+};
+
+struct SkyStarOut {
+    float4 position [[position]];
+    float4 color;
+    float2 local;
+    float radius [[flat]];
+};
+
+vertex SkyStarOut skyStarVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
+                                constant SkyStar *stars [[buffer(0)]],
+                                constant SkyUniforms &u [[buffer(1)]]) {
+    SkyStar s = stars[iid];
+    float3 v = (u.j2000ToView * float4(s.direction, 0)).xyz;
+    SkyStarOut out;
+    out.color = s.color;
+    out.radius = s.radius * u.pixelsPerPoint;
+    if (v.z < 0.05) {
+        // Behind the camera: collapse to nothing.
+        out.position = float4(2, 2, 0, 1);
+        out.local = float2(0);
+        return out;
+    }
+    float2 points = v.xy / v.z * u.focal;
+    float extent = out.radius + 1.0;
+    float2 corner = float2((vid & 1) ? 1.0 : -1.0, (vid & 2) ? 1.0 : -1.0);
+    out.position = float4(points * 2.0 / u.screen + corner * extent * 2.0 / u.viewport, 0, 1);
+    out.local = corner * extent;
+    return out;
+}
+
+fragment float4 skyStarFragment(SkyStarOut in [[stage_in]]) {
+    float a = saturate(in.radius - length(in.local) + 0.5) * in.color.a;
+    return float4(in.color.rgb * a, a);
 }
 """#
 }

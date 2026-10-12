@@ -51,7 +51,8 @@ final class SkyDirectionCache {
 
     func directions(for objects: [SkyObject], sky: LocalSky) -> [SIMD3<Double>] {
         if objects.count != count || Date().timeIntervalSince(computedAt) > 1 {
-            directions = objects.map { sky.direction(ofEquatorialJ2000: $0.equatorial) }
+            let rotation = sky.fromJ2000
+            directions = objects.map { rotation * $0.equatorial }
             computedAt = Date()
             count = objects.count
         }
