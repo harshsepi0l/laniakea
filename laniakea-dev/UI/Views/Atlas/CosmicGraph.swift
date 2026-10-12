@@ -59,6 +59,8 @@ struct GraphScene {
     let fitRadius: Double
     var fitCenter: SIMD2<Double> = .zero
     let caption: String
+    /// Each node's linked neighbours, built on first use (selection asks every frame).
+    let adjacency = AdjacencyCache()
 
     enum Unit {
         case megaparsecs, parsecs
@@ -69,11 +71,26 @@ struct GraphScene {
 
     /// Indices of the nodes linked to `index`.
     func neighbors(of index: Int) -> Set<Int> {
-        var result = Set<Int>()
-        for (a, b) in links {
-            if a == index { result.insert(b) } else if b == index { result.insert(a) }
+        adjacency.neighbors(of: index, nodeCount: nodes.count, links: links)
+    }
+}
+
+/// Neighbour lists for a scene, so a lookup doesn't scan every link. A class so the immutable scene
+/// can fill it in lazily.
+final class AdjacencyCache {
+    private var lists: [[Int]]?
+
+    func neighbors(of index: Int, nodeCount: Int, links: [(Int, Int)]) -> Set<Int> {
+        if lists == nil {
+            var built = [[Int]](repeating: [], count: nodeCount)
+            for (a, b) in links where a < nodeCount && b < nodeCount {
+                built[a].append(b)
+                built[b].append(a)
+            }
+            lists = built
         }
-        return result
+        guard let lists, lists.indices.contains(index) else { return [] }
+        return Set(lists[index])
     }
 }
 

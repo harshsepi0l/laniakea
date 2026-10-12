@@ -40,6 +40,17 @@ struct LocalSky {
         return Self.direction(altitude: altitude, azimuth: azimuth)
     }
 
+    /// The same change of frame as `direction(ofEquatorialJ2000:)` as one matrix: precession and
+    /// the turn to the local horizon are both rotations, so applying it to a J2000 direction gives
+    /// the same answer far faster for thousands of stars.
+    var fromJ2000: simd_double3x3 {
+        simd_double3x3(columns: (
+            direction(ofEquatorialJ2000: SIMD3(1, 0, 0)),
+            direction(ofEquatorialJ2000: SIMD3(0, 1, 0)),
+            direction(ofEquatorialJ2000: SIMD3(0, 0, 1))
+        ))
+    }
+
     func direction(raDeg: Double, decDeg: Double) -> SIMD3<Double> {
         direction(ofEquatorialJ2000: SkyCoordinates.cartesian(longitudeDeg: raDeg, latitudeDeg: decDeg, distance: 1))
     }

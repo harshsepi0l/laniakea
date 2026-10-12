@@ -11,7 +11,8 @@ struct ExoplanetSystemView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var selected: Exoplanet?
-    @State private var showPlanets = false
+    /// The planet list, switched from Atlas's controls.
+    @Binding var showPlanets: Bool
 
     var body: some View {
         GeometryReader { geo in
@@ -27,14 +28,15 @@ struct ExoplanetSystemView: View {
         .overlay(alignment: .bottomLeading) {
             if !planets.isEmpty, planets.allSatisfy({ phase(of: $0) == nil }) {
                 note("Where these planets are along their orbits hasn't been measured.")
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, AtlasChrome.bottomInset)
             }
         }
         // A pull-out list, like the other maps' objects panels, so it never covers the system.
         .overlay(alignment: .topTrailing) {
             planetPanel
-                .padding(.top, 64)
-                .padding(.bottom, 8)
+                .padding(.top, AtlasChrome.panelTop)
+                .padding(.bottom, AtlasChrome.panelBottom)
         }
         .sheet(item: $selected) { planet in
             ExoplanetDetailSheet(planet: planet, system: system)
@@ -43,19 +45,7 @@ struct ExoplanetSystemView: View {
 
     private var planetPanel: some View {
         HStack(alignment: .top, spacing: 0) {
-            if !showPlanets {
-                Button {
-                    showPlanets = true
-                } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(Color(.systemGray6), in: Circle())
-                }
-                .accessibilityLabel("Show planets")
-                .padding(.trailing, 16)
-            } else {
+            if showPlanets {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Text(planets.count == 1 ? "1 planet" : "\(planets.count) planets")

@@ -1,88 +1,53 @@
 import SwiftUI
 
+/// Sizes the map views share with Atlas's floating controls, so nothing sits under them.
+enum AtlasChrome {
+    /// Round buttons: back, the right-hand column, search.
+    static let cornerButton: CGFloat = 44
+    /// Room at the bottom for the search button and the time controls.
+    static let bottomInset: CGFloat = 64
+    /// Gap between the bottom controls and the tab bar.
+    static let bottomGap: CGFloat = 10
+    /// The open search field, with the gap above it.
+    static let searchFieldHeight: CGFloat = 56
+    /// Where pull-out lists start and stop: below the place name, above the bottom controls.
+    static let panelTop: CGFloat = 60
+    static let panelBottom: CGFloat = 64
+}
+
+/// The atlas: the map fills the screen, and the controls float over it. Top left is where you are
+/// (back, and the whole path in a menu); down the right are facts, the sky view, filters, the
+/// list of what's here and, in the Solar System, 3D; along the bottom are time and search.
 struct AtlasView: View {
     @StateObject private var solarSystemVM = SolarSystemViewModel(repo: CosmicCatalog.shared)
     @StateObject private var cosmos = CosmosViewModel(repo: CosmicCatalog.shared)
     @State private var searchText = ""
+    @State private var isSearching = false
     @State private var focusID: String?
     @State private var factSubject: FactSubject?
     @State private var showSky = false
+    @State private var showFilters = false
+    @State private var showList = false
+    @State private var solar3D = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Button {
-                        cosmos.showLaniakea()
-                    } label: {
-                        Label("Laniakea", systemImage: "circle.circle")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .padding(.horizontal, 14)
-                            .frame(height: 40)
-                            .background(Color(.systemGray6), in: Capsule())
-                    }
-                    .accessibilityHint("Zooms out to the Laniakea supercluster")
-                    Button {
-                        factSubject = FactSubject(cosmos.current)
-                    } label: {
-                        Image(systemName: "info")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(width: 40, height: 40)
-                            .background(Color(.systemGray6), in: Circle())
-                    }
-                    .accessibilityLabel("Facts about \(cosmos.current == .solarSystem ? "the Sun" : cosmos.current.title)")
-                    Button {
-                        showSky = true
-                    } label: {
-                        Image(systemName: "camera.viewfinder")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(width: 40, height: 40)
-                            .background(Color(.systemGray6), in: Circle())
-                    }
-                    .accessibilityLabel("Sky view")
-                    .accessibilityHint("Point your device at the sky to find stars and planets")
-                    Spacer(minLength: 8)
-                    Breadcrumb(path: cosmos.path) { cosmos.goBack(to: $0) }
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+                .overlay(alignment: .top) { topControls }
+                .overlay(alignment: .bottom) { bottomControls }
+                .toolbar(.hidden, for: .navigationBar)
+                .sheet(item: $factSubject) { FactSheetView(subject: $0) }
+                .sheet(isPresented: $showFilters) { filterSheet }
+                .sheet(item: $solarSystemVM.selectedPlanet) { planet in
+                    PlanetDetailSheet(
+                        planet: planet,
+                        distanceFromSunAU: solarSystemVM.distanceFromSun(planet),
+                        distanceFromEarthAU: solarSystemVM.distanceFromEarth(planet),
+                        distanceDateLabel: solarSystemVM.selectionDateLabel
+                    )
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-
-                // Planets move between constellations while the clock plays, so the Solar System's
-                // counts refresh each second.
-                TimelineView(.periodic(from: .now, by: cosmos.current == .solarSystem ? 1 : 3600)) { _ in
-                    FilterBar(kinds: filterKinds, constellations: filterConstellations, filter: $cosmos.filter) {
-                        factSubject = .constellation($0)
-                    }
-                }
-                .padding(.vertical, 8)
-
-                content
-                    .sheet(item: $factSubject) { FactSheetView(subject: $0) }
-            }
-            .navigationTitle("Atlas")
-            .navigationBarTitleDisplayMode(.inline)
-            .background(Color(.systemBackground))
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 8) {
-                    if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                        searchResults
-                    }
-                    AtlasSearchField(text: $searchText, prompt: "Search \(cosmos.current.title)")
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            }
-            .sheet(item: $solarSystemVM.selectedPlanet) { planet in
-                PlanetDetailSheet(
-                    planet: planet,
-                    distanceFromSunAU: solarSystemVM.distanceFromSun(planet),
-                    distanceFromEarthAU: solarSystemVM.distanceFromEarth(planet),
-                    distanceDateLabel: solarSystemVM.selectionDateLabel
-                )
-            }
         }
         .fullScreenCover(isPresented: $showSky) {
             SkyView(
@@ -98,6 +63,10 @@ struct AtlasView: View {
                 }
             )
         }
+        .onChange(of: cosmos.current) { _, _ in
+            showList = false
+            closeSearch()
+        }
         .onAppear {
             solarSystemVM.load()
             cosmos.load(cosmos.current)
@@ -106,6 +75,102 @@ struct AtlasView: View {
         }
     }
 
+    // MARK: Floating controls
+
+    private var topControls: some View {
+        HStack(alignment: .top, spacing: 8) {
+            PlaceControl(path: cosmos.path) { cosmos.goBack(to: $0) }
+            Spacer(minLength: 8)
+            // The list slides in on the right and has its own close button.
+            if !showList { rail.transition(.opacity) }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .animation(.easeInOut(duration: 0.2), value: showList)
+    }
+
+    private var rail: some View {
+        VStack(spacing: 10) {
+            RoundButton(systemImage: "info", label: "Facts about \(cosmos.current == .solarSystem ? "the Sun" : cosmos.current.title)") {
+                factSubject = FactSubject(cosmos.current)
+            }
+            RoundButton(systemImage: "camera.viewfinder", label: "Sky view") { showSky = true }
+                .accessibilityHint("Point your device at the sky to find stars and planets")
+            RoundButton(systemImage: "line.3.horizontal.decrease", label: "Filter", badge: filterCount) { showFilters = true }
+            RoundButton(systemImage: "list.bullet", label: listLabel) { showList = true }
+            if cosmos.current == .solarSystem {
+                RoundButton(text: solar3D ? "2D" : "3D", label: solar3D ? "Switch to flat view" : "Switch to 3D view") { solar3D.toggle() }
+            }
+        }
+    }
+
+    private var listLabel: String {
+        if case .starSystem = cosmos.current { return "Show planets" }
+        return "Show objects"
+    }
+
+    /// How many filter choices are on, shown on the filter button.
+    private var filterCount: Int {
+        cosmos.filter.kinds.count + (cosmos.filter.constellation == nil ? 0 : 1)
+    }
+
+    private var bottomControls: some View {
+        VStack(spacing: 8) {
+            if isSearching {
+                if !searchText.trimmingCharacters(in: .whitespaces).isEmpty { searchResults }
+                HStack(spacing: 8) {
+                    AtlasSearchField(text: $searchText, prompt: "Search \(cosmos.current.title)", focusOnAppear: true)
+                    Button("Cancel") { closeSearch() }
+                        .font(.system(size: 16, weight: .medium))
+                        .tint(.orange)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                HStack(alignment: .bottom, spacing: 8) {
+                    if let clock = timeClock { TimeControls(clock: clock) }
+                    Spacer(minLength: 0)
+                    if canSearch {
+                        RoundButton(systemImage: "magnifyingglass", label: "Search \(cosmos.current.title)") {
+                            withAnimation(.easeInOut(duration: 0.2)) { isSearching = true }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, AtlasChrome.bottomGap)
+    }
+
+    /// The clock that runs the current place, if it moves.
+    private var timeClock: SimulationClock? {
+        switch cosmos.current {
+        case .solarSystem: return solarSystemVM.planets.isEmpty ? nil : solarSystemVM.clock
+        case .starSystem(let system): return cosmos.exoplanets[system] == nil ? nil : cosmos.exoplanetClock
+        default: return nil
+        }
+    }
+
+    private var canSearch: Bool {
+        if case .starSystem = cosmos.current { return false }
+        return true
+    }
+
+    private func closeSearch() {
+        searchText = ""
+        withAnimation(.easeInOut(duration: 0.2)) { isSearching = false }
+    }
+
+    private var filterSheet: some View {
+        // Planets move between constellations while the clock plays, so the counts refresh each second.
+        TimelineView(.periodic(from: .now, by: cosmos.current == .solarSystem ? 1 : 3600)) { _ in
+            FilterSheet(place: cosmos.current.title, kinds: filterKinds, constellations: filterConstellations, filter: $cosmos.filter)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    // MARK: Maps
+
     @ViewBuilder
     private var content: some View {
         switch cosmos.current {
@@ -113,17 +178,13 @@ struct AtlasView: View {
             solarSystem
         case .starSystem(let system):
             if let planets = cosmos.exoplanets[system] {
-                ZStack(alignment: .top) {
-                    ExoplanetSystemView(
-                        system: system,
-                        // All of a star's planets lie in its constellation, so only the kind filter applies here.
-                        planets: planets.filter { cosmos.filter.kinds.isEmpty || cosmos.filter.kinds.contains(ObjectKind.planet(radiusEarths: $0.radiusEarths)) },
-                        clock: cosmos.exoplanetClock
-                    )
-                    SimulationControls(clock: cosmos.exoplanetClock)
-                        .padding(.top, 8)
-                        .padding(.horizontal, 16)
-                }
+                ExoplanetSystemView(
+                    system: system,
+                    // All of a star's planets lie in its constellation, so only the kind filter applies here.
+                    planets: planets.filter { cosmos.filter.kinds.isEmpty || cosmos.filter.kinds.contains(ObjectKind.planet(radiusEarths: $0.radiusEarths)) },
+                    clock: cosmos.exoplanetClock,
+                    showPlanets: $showList
+                )
             } else {
                 loadingOrError(cosmos.current, loading: "Loading \(system.name)'s planets…")
             }
@@ -131,7 +192,9 @@ struct AtlasView: View {
             if let scene = cosmos.scenes[cosmos.current] {
                 CosmicGraphView(
                     scene: scene, focusID: $focusID, visible: cosmos.visibility(for: cosmos.current),
-                    onOpen: { cosmos.open($0) }, onFacts: { factSubject = $0 }
+                    onOpen: { cosmos.open($0) }, onFacts: { factSubject = $0 }, showObjects: $showList,
+                    // The scale and caption sit beside the search button, and move up over the open field.
+                    bottomInset: AtlasChrome.bottomGap + (isSearching ? AtlasChrome.searchFieldHeight : 0)
                 )
                 .id(cosmos.current)
             } else {
@@ -149,26 +212,21 @@ struct AtlasView: View {
         } else if solarSystemVM.planets.isEmpty {
             ProgressView().frame(maxHeight: .infinity)
         } else {
-            ZStack(alignment: .top) {
-                SolarSystemView(
-                    planets: solarSystemVM.planets,
-                    clock: solarSystemVM.clock,
-                    selectedPlanetID: solarSystemVM.selectedPlanet?.id,
-                    sunTemperatureK: cosmos.sunTemperatureK,
-                    isShown: { planet, date in
-                        planet.id == Planet.earthID || cosmos.filter.allows(
-                            kind: ObjectKind.solarSystem(densityGramsPerCm3: planet.densityGramsPerCm3),
-                            constellation: constellation(of: planet, at: date)
-                        )
-                    }
-                ) { planet in
-                    solarSystemVM.select(planet)
-                }
-                SimulationControls(clock: solarSystemVM.clock)
-                    .padding(.top, 8)
-                    .padding(.horizontal, 16)
-            }
-            .background(Color(.systemBackground))
+            SolarSystemView(
+                planets: solarSystemVM.planets,
+                clock: solarSystemVM.clock,
+                selectedPlanetID: solarSystemVM.selectedPlanet?.id,
+                sunTemperatureK: cosmos.sunTemperatureK,
+                isShown: { planet, date in
+                    planet.id == Planet.earthID || cosmos.filter.allows(
+                        kind: ObjectKind.solarSystem(densityGramsPerCm3: planet.densityGramsPerCm3),
+                        constellation: constellation(of: planet, at: date)
+                    )
+                },
+                onSelect: { solarSystemVM.select($0) },
+                showObjects: $showList,
+                is3DOn: $solar3D
+            )
         }
     }
 
@@ -332,114 +390,151 @@ struct AtlasView: View {
     }
 }
 
-/// Where you are: each step back out is tappable. Long paths drop their middle steps to fit.
-struct Breadcrumb: View {
+/// Where you are, top left: a back button one step out, and the place's name over the place it's
+/// in. Tapping the name lists the whole path to jump to any step.
+struct PlaceControl: View {
     let path: [AtlasPlace]
     let onSelect: (Int) -> Void
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            trail(Array(path.indices))
-            if path.count > 2 { trail([0, -1, path.count - 1]) }
-            trail([path.count - 1])
-        }
-        .font(.system(size: 13))
-        .padding(.horizontal, 14)
-        .frame(height: 40)
-        .background(Color(.systemGray6), in: Capsule())
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("You are in \(path.last?.title ?? "")")
-    }
-
-    /// Indices into `path`; -1 stands for the collapsed middle.
-    private func trail(_ indices: [Int]) -> some View {
         HStack(spacing: 6) {
-            ForEach(Array(indices.enumerated()), id: \.offset) { position, index in
-                if position > 0 {
-                    Text("›").foregroundColor(.secondary)
-                }
-                if index < 0 {
-                    Text("…").foregroundColor(.secondary)
-                } else if index == path.count - 1 {
-                    Text(path[index].title)
-                        .fontWeight(.semibold)
+            if path.count > 1 {
+                Button { onSelect(path.count - 2) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.primary)
-                } else {
-                    Button(path[index].title) { onSelect(index) }
-                        .foregroundColor(.secondary)
-                        .buttonStyle(.plain)
+                        .frame(width: 36, height: 36)
+                        .background(Color.primary.opacity(0.08), in: Circle())
                 }
+                .accessibilityLabel("Back to \(path[path.count - 2].title)")
             }
+            Menu {
+                ForEach(Array(path.indices.reversed()), id: \.self) { i in
+                    Button { onSelect(i) } label: {
+                        if i == path.count - 1 {
+                            Label(path[i].title, systemImage: "checkmark")
+                        } else {
+                            Text(path[i].title)
+                        }
+                    }
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    if path.count > 1 {
+                        Text(path[path.count - 2].title)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 4) {
+                        Text(path.last?.title ?? "")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .lineLimit(1)
+                .padding(.leading, path.count > 1 ? 0 : 8)
+                .padding(.trailing, 8)
+                .frame(minHeight: 36)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("You are in \(path.last?.title ?? ""). Show the path")
         }
-        .lineLimit(1)
-        .fixedSize()
+        .padding(4)
+        .atlasGlass(Capsule())
     }
 }
 
-struct SimulationControls: View {
+/// A round floating button with an icon or a short word, and an optional count badge.
+struct RoundButton: View {
+    var systemImage: String? = nil
+    var text: String? = nil
+    let label: String
+    var badge = 0
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if let systemImage {
+                    Image(systemName: systemImage).font(.system(size: 16, weight: .semibold))
+                } else {
+                    Text(text ?? "").font(.system(size: 13, weight: .bold))
+                }
+            }
+            .foregroundColor(.primary)
+            .frame(width: AtlasChrome.cornerButton, height: AtlasChrome.cornerButton)
+            .atlasGlass(Circle())
+            .overlay(alignment: .topTrailing) {
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.system(size: 11, weight: .bold).monospacedDigit())
+                        .foregroundColor(.black)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(Color.orange, in: Capsule())
+                        .offset(x: 4, y: -4)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(badge > 0 ? "\(label), \(badge) on" : label)
+    }
+}
+
+/// The date, play and pause, speed and a jump back to today, in one pill.
+struct TimeControls: View {
     @ObservedObject var clock: SimulationClock
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                TimelineView(.periodic(from: .now, by: 0.1)) { _ in
-                    Text(clock.simulatedDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 15, weight: .semibold).monospacedDigit())
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                }
-                Text("Not to scale")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+        HStack(spacing: 2) {
+            Button { clock.isPlaying.toggle() } label: {
+                Image(systemName: clock.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .background(Color.primary.opacity(0.08), in: Circle())
             }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 4) {
-                Button {
-                    clock.isPlaying.toggle()
-                } label: {
-                    Text(clock.isPlaying ? "Pause" : "Play")
-                        .frame(minWidth: 52)
-                        .padding(.horizontal, 12)
-                        .frame(height: 36)
-                        .background(Color(.systemBackground), in: Capsule())
-                }
-
-                Menu {
-                    Picker("Speed", selection: $clock.speed) {
-                        ForEach(SimulationClock.Speed.allCases) { option in
-                            Text(option.label).tag(option)
-                        }
+            .accessibilityLabel(clock.isPlaying ? "Pause" : "Play")
+            TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                Text(clock.simulatedDate.formatted(date: .abbreviated, time: .omitted))
+                    .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                    .padding(.horizontal, 8)
+            }
+            Menu {
+                Picker("Speed", selection: $clock.speed) {
+                    ForEach(SimulationClock.Speed.allCases) { option in
+                        Text(option.label).tag(option)
                     }
-                } label: {
-                    Text(clock.speed.label)
-                        .padding(.horizontal, 12)
-                        .frame(height: 36)
                 }
-
-                Button {
-                    clock.reset()
-                } label: {
-                    Text("Today")
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 12)
-                        .frame(height: 36)
-                }
+            } label: {
+                Text(clock.speed.label)
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .frame(height: 36)
             }
-            .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.primary)
-            .lineLimit(1)
-            .padding(4)
-            .background(Color(.systemGray6), in: Capsule())
-            .fixedSize()
+            .accessibilityLabel("Speed, \(clock.speed.label)")
+            Button { clock.reset() } label: {
+                Text("Today")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 8)
+                    .frame(height: 36)
+            }
         }
+        .foregroundColor(.primary)
+        .lineLimit(1)
+        .padding(4)
+        .atlasGlass(Capsule())
+        .fixedSize()
     }
 }
 
 struct AtlasSearchField: View {
     @Binding var text: String
     var prompt = "Search"
+    var focusOnAppear = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -464,104 +559,127 @@ struct AtlasSearchField: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 48)
-        .modifier(SearchFieldBackground())
+        .atlasGlass(Capsule())
         .contentShape(Capsule())
         .onTapGesture { isFocused = true }
+        .onAppear { if focusOnAppear { isFocused = true } }
     }
 }
 
-private struct SearchFieldBackground: ViewModifier {
+extension View {
+    /// The floating controls' background: Liquid Glass where available, else a blurred material.
+    func atlasGlass<S: Shape>(_ shape: S) -> some View {
+        modifier(AtlasGlass(shape: shape))
+    }
+}
+
+private struct AtlasGlass<S: Shape>: ViewModifier {
+    let shape: S
+
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: Capsule())
+            content.glassEffect(.regular.interactive(), in: shape)
         } else {
             content
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().stroke(Color(.separator).opacity(0.4), lineWidth: 0.5))
+                .background(.regularMaterial, in: shape)
+                .overlay(shape.stroke(Color(.separator).opacity(0.4), lineWidth: 0.5))
         }
     }
 }
 
-/// Filter chips for the current place: a constellation menu and the kinds of object found here.
-struct FilterBar: View {
+/// Filters for the current place, in a sheet: the kinds of object found here, and a constellation.
+struct FilterSheet: View {
+    let place: String
     let kinds: [(kind: ObjectKind, count: Int)]
-    /// Nil hides the constellation menu; empty shows it disabled while the boundaries load.
+    /// Nil hides constellations; empty shows them as loading.
     let constellations: [(abbreviation: String, count: Int)]?
     @Binding var filter: AtlasFilter
-    /// Opens the selected constellation's fact sheet.
-    var onConstellationFacts: (String) -> Void = { _ in }
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var facts: FactSubject?
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                if let constellations {
-                    Menu {
-                        if filter.constellation != nil {
-                            Button("All constellations") { filter.constellation = nil }
-                        }
-                        ForEach(constellations, id: \.abbreviation) { item in
-                            Button("\(Constellation.name(item.abbreviation))  \(item.count.formatted())") {
-                                filter.constellation = item.abbreviation
+        NavigationStack {
+            List {
+                if kinds.count > 1 || !filter.kinds.isEmpty {
+                    Section {
+                        ForEach(kinds, id: \.kind) { item in
+                            row(selected: filter.kinds.contains(item.kind)) {
+                                if filter.kinds.contains(item.kind) { filter.kinds.remove(item.kind) } else { filter.kinds.insert(item.kind) }
+                            } content: {
+                                if let swatch = swatch(item.kind) { Circle().fill(swatch).frame(width: 10, height: 10) }
+                                Text(item.kind.label)
+                                Spacer()
+                                Text(item.count.formatted()).foregroundColor(.secondary).monospacedDigit()
                             }
                         }
-                    } label: {
-                        chip(filter.constellation.map(Constellation.name) ?? "Constellation", icon: "sparkles",
-                             selected: filter.constellation != nil)
-                    }
-                    .disabled(constellations.isEmpty && filter.constellation == nil)
-                    if let abbreviation = filter.constellation {
-                        Button { onConstellationFacts(abbreviation) } label: {
-                            Image(systemName: "info").font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.primary).frame(width: 34, height: 34)
-                                .background(Color(.systemGray6), in: Circle())
-                        }
-                        .accessibilityLabel("Facts about \(Constellation.name(abbreviation))")
+                    } header: {
+                        Text("Show")
+                    } footer: {
+                        Text("Pick none to show everything.")
                     }
                 }
-                if kinds.count > 1 || !filter.kinds.isEmpty {
-                    ForEach(kinds, id: \.kind) { item in
-                        Button {
-                            if filter.kinds.contains(item.kind) { filter.kinds.remove(item.kind) } else { filter.kinds.insert(item.kind) }
-                        } label: {
-                            chip("\(item.kind.label)  \(item.count.formatted())", swatch: swatch(item.kind),
-                                 selected: filter.kinds.contains(item.kind))
+                if let constellations {
+                    Section("Constellation") {
+                        if constellations.isEmpty && filter.constellation == nil {
+                            HStack { ProgressView(); Text("Loading the constellations…").foregroundColor(.secondary) }
+                        } else {
+                            row(selected: filter.constellation == nil) { filter.constellation = nil } content: {
+                                Text("All constellations")
+                                Spacer()
+                            }
+                            ForEach(constellations, id: \.abbreviation) { item in
+                                row(selected: filter.constellation == item.abbreviation) { filter.constellation = item.abbreviation } content: {
+                                    Text(Constellation.name(item.abbreviation))
+                                    Spacer()
+                                    Text(item.count.formatted()).foregroundColor(.secondary).monospacedDigit()
+                                    Button { facts = .constellation(item.abbreviation) } label: {
+                                        Image(systemName: "info.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .tint(.orange)
+                                    .accessibilityLabel("Facts about \(Constellation.name(item.abbreviation))")
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-                if filter.isActive {
-                    Button("Clear") { filter = AtlasFilter() }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 8)
-                        .frame(height: 34)
                 }
             }
-            .padding(.horizontal, 16)
+            .navigationTitle("Filter \(place)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Clear") { filter = AtlasFilter() }
+                        .disabled(!filter.isActive)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+            .tint(.orange)
+            .sheet(item: $facts) { FactSheetView(subject: $0) }
         }
     }
 
-    @Environment(\.colorScheme) private var colorScheme
+    /// A tappable row with a checkmark when chosen.
+    private func row<Content: View>(selected: Bool, action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                content()
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.orange)
+                    .opacity(selected ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .foregroundColor(.primary)
+    }
 
     private func swatch(_ kind: ObjectKind) -> Color? {
         let dark = colorScheme == .dark
         if let t = kind.swatchTemperature { return StarColor.swiftUI(temperature: t, dark: dark) }
         return kind.swatchComposition?.swiftUI(dark: dark)
-    }
-
-    private func chip(_ text: String, icon: String? = nil, swatch: Color? = nil, selected: Bool) -> some View {
-        HStack(spacing: 5) {
-            if let icon { Image(systemName: icon).font(.system(size: 12)) }
-            if let swatch {
-                Circle().fill(swatch).frame(width: 8, height: 8)
-                    .overlay(Circle().stroke(Color.white.opacity(selected ? 0.8 : 0), lineWidth: 1))
-            }
-            Text(text).font(.system(size: 14, weight: selected ? .semibold : .regular)).monospacedDigit()
-        }
-        .foregroundColor(selected ? .white : .primary)
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .background(selected ? Color.orange : Color(.systemGray6), in: Capsule())
-        .contentShape(Capsule())
     }
 }

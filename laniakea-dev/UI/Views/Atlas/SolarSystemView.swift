@@ -21,7 +21,9 @@ struct SolarSystemView: View {
     @State private var tiltStart = Date.distantPast
     @State private var pinchTilt: Double?
     @State private var isAnimatingTilt = false
-    @State private var showObjects = false
+    /// The objects list and the 3D view, switched from Atlas's controls.
+    @Binding var showObjects: Bool
+    @Binding var is3DOn: Bool
     // Flat view: a small rubber-banded drag. 3D view: zoom around the pinch, and pan within the zoomed area.
     @State private var rawPan: CGSize = .zero
     @State private var rawPanStart: CGSize?
@@ -134,23 +136,12 @@ struct SolarSystemView: View {
                 )
 
                 objectsPanel
-                    .padding(.top, 64)
-                    .padding(.bottom, 8)
-
-                Button {
-                    animateTilt(from: tiltTo, to: is3D ? 0 : 1)
-                } label: {
-                    Text(is3D ? "2D" : "3D")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(Color(.systemGray6), in: Circle())
-                }
-                .accessibilityLabel(is3D ? "Switch to flat view" : "Switch to 3D view")
-                .padding(.top, 64)
-                .padding(.leading, 16)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, AtlasChrome.panelTop)
+                    .padding(.bottom, AtlasChrome.panelBottom)
             }
+        }
+        .onChange(of: is3DOn) { _, on in
+            if on != isIn3DMode { animateTilt(from: tiltTo, to: on ? 1 : 0) }
         }
         .animation(.easeInOut(duration: 0.2), value: is3D)
         .accessibilityElement(children: .contain)
@@ -165,19 +156,7 @@ struct SolarSystemView: View {
 
     private var objectsPanel: some View {
         HStack(alignment: .top, spacing: 0) {
-            if !showObjects {
-                Button {
-                    showObjects = true
-                } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(Color(.systemGray6), in: Circle())
-                }
-                .accessibilityLabel("Show objects")
-                .padding(.trailing, 16)
-            } else {
+            if showObjects {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Text("Objects")
@@ -278,6 +257,7 @@ struct SolarSystemView: View {
         zoom = 1
         tiltFrom = from
         tiltTo = to
+        is3DOn = to > 0.5
         tiltStart = Date()
         isAnimatingTilt = true
         Task {

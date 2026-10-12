@@ -10,8 +10,15 @@ struct SkyCornerMap: View {
     let projection: () -> SkyProjection
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.1)) { timeline in
-            Canvas { context, size in draw(in: &context, size: size, date: timeline.date) }
+        ZStack {
+            // The stars only change with the pick, so they're drawn apart from the live layer,
+            // which redraws ten times a second as you turn.
+            if !isSolarSystem {
+                Canvas { context, size in drawStarField(in: &context, size: size) }
+            }
+            TimelineView(.periodic(from: .now, by: 0.1)) { timeline in
+                Canvas { context, size in draw(in: &context, size: size, date: timeline.date) }
+            }
         }
         .frame(width: 150, height: 150)
         .background(Color(red: 0.043, green: 0.047, blue: 0.063).opacity(0.92), in: RoundedRectangle(cornerRadius: 22))
@@ -39,18 +46,21 @@ struct SkyCornerMap: View {
         if isSolarSystem { drawSolarSystem(in: &context, size: size, date: date) } else { drawStars(in: &context, size: size, date: date) }
     }
 
-    /// Naked-eye stars seen from above the Milky Way's disc, the Sun at the centre, scaled so the
-    /// picked star sits near the edge.
-    private func drawStars(in context: inout GraphicsContext, size: CGSize, date: Date) {
+    /// The star map's frame: the Sun at the centre, scaled so the picked star sits near the edge.
+    private func starLayout(size: CGSize) -> (centre: CGPoint, reach: Double, scale: Double, target: SIMD2<Double>?) {
         let centre = CGPoint(x: size.width / 2, y: size.height / 2 + 6)
         var target: (point: SIMD2<Double>, distance: Double)?
         if case .star(let star, _) = selected?.kind, let p = star.position, let d = star.distanceParsecs {
             target = (SIMD2(p.x, p.y), d)
         }
         let reach = max((target?.distance ?? 100) * 1.4, 20)
-        let scale = Double(size.width) * 0.42 / reach
-        func screen(_ p: SIMD2<Double>) -> CGPoint { CGPoint(x: centre.x + p.x * scale, y: centre.y - p.y * scale) }
+        return (centre, reach, Double(size.width) * 0.42 / reach, target?.point)
+    }
 
+    /// Naked-eye stars seen from above the Milky Way's disc.
+    private func drawStarField(in context: inout GraphicsContext, size: CGSize) {
+        let (centre, reach, scale, _) = starLayout(size: size)
+        func screen(_ p: SIMD2<Double>) -> CGPoint { CGPoint(x: centre.x + p.x * scale, y: centre.y - p.y * scale) }
         // Zoomed out, thousands of stars fall inside the map, so they shrink and fade to stay a backdrop.
         let dot: CGFloat = reach > 120 ? 1.1 : 2
         let opacity = reach > 120 ? 0.3 : 0.55
@@ -61,11 +71,17 @@ struct SkyCornerMap: View {
             bins[StarColor.bin(temperature: star.temperatureK ?? 5772), default: Path()].addEllipse(in: CGRect(x: s.x - dot / 2, y: s.y - dot / 2, width: dot, height: dot))
         }
         for (bin, path) in bins { context.fill(path, with: .color(StarColor.color(bin: bin).color(dark: true).opacity(opacity))) }
+    }
+
+    /// Which way you're facing and the picked star, over the star field.
+    private func drawStars(in context: inout GraphicsContext, size: CGSize, date: Date) {
+        let (centre, _, scale, target) = starLayout(size: size)
+        func screen(_ p: SIMD2<Double>) -> CGPoint { CGPoint(x: centre.x + p.x * scale, y: centre.y - p.y * scale) }
 
         drawWedge(in: &context, centre: centre, radius: size.width * 0.75, date: date)
 
         if let target {
-            let p = screen(target.point)
+            let p = screen(target)
             var line = Path(); line.move(to: centre); line.addLine(to: p)
             context.stroke(line, with: .color(here), lineWidth: 1.4)
             context.stroke(Path(ellipseIn: CGRect(x: p.x - 6, y: p.y - 6, width: 12, height: 12)), with: .color(here), lineWidth: 1.6)

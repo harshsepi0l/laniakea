@@ -31,6 +31,8 @@ struct SkyView: View {
     @AppStorage("sky.showsFacts") private var showsFacts = true
     @AppStorage("sky.showsLock") private var showsLock = true
     private let cache = SkyDirectionCache()
+    /// Draws the naked-eye stars on the GPU; the overlay above draws everything else.
+    @State private var starRenderer = SkyStarRenderer()
     private let reticle = Reticle()
 
     var body: some View {
@@ -45,6 +47,11 @@ struct SkyView: View {
                         .opacity(model.isDragged ? 0 : 1)
                         .animation(.easeInOut(duration: 0.35), value: model.isDragged)
                 }
+
+                SkyStarView(renderer: starRenderer, objects: model.objects,
+                            projection: { projection(size: geo.size) }, sky: { model.localSky(at: Date()) })
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
 
                 TimelineView(.animation) { timeline in
                     Canvas { context, size in
@@ -134,7 +141,8 @@ struct SkyView: View {
     }
 
     /// Picks what was tapped (the nearest object within a fingertip; brightness only breaks near
-    /// ties) and holds it; a tap on empty sky lets go. While locked, taps change nothing.
+    /// ties) and locks onto it, as the lock button would (or just holds it with the button turned
+    /// off in Settings); a tap on empty sky lets go of a hold. While locked, taps change nothing.
     private func tap(at location: CGPoint, size: CGSize) {
         guard !isLocked, let sky = model.localSky(at: Date()) else { return }
         let proj = projection(size: size)
@@ -147,9 +155,11 @@ struct SkyView: View {
             let score = d + 1.5 * object.magnitude
             if score < best?.score ?? .infinity { best = (object.id, score) }
         }
+        if best != nil, showsLock { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedID = best?.id
             isHeld = best != nil
+            isLocked = best != nil && showsLock
         }
     }
 
@@ -168,17 +178,16 @@ struct SkyView: View {
 
         let dirs = cache.directions(for: model.objects, sky: sky)
         var selectedSpot: (point: CGPoint, half: CGFloat)?
-        var bins: [Int: Path] = [:]
         var labels: [(String, CGPoint, CGFloat, Bool)] = []
         for (object, dir) in zip(model.objects, dirs) {
-            guard let p = proj.point(dir), bounds.contains(p) else { continue }
             let isSelected = object.id == selectedID
+            // The stars' dots are drawn on the GPU (SkyStarView); here only the bright ones' names
+            // and the pick need them.
+            if case .star = object.kind, object.magnitude >= 1.6, !isSelected { continue }
+            guard let p = proj.point(dir), bounds.contains(p) else { continue }
             switch object.kind {
             case .star:
-                let r = dotRadius(object)
-                bins[StarColor.bin(temperature: object.temperatureK ?? 5772), default: Path()]
-                    .addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
-                if object.magnitude < 1.6 || isSelected { labels.append((object.name, p, r, isSelected)) }
+                labels.append((object.name, p, dotRadius(object), isSelected))
             case .planet:
                 let color = object.composition.swiftUI(dark: true)
                 glow(&context, p, 14, color)
@@ -193,9 +202,6 @@ struct SkyView: View {
             if isSelected {
                 selectedSpot = (p, object.id == "sun" ? 20 : max(dotRadius(object) + 9, 14))
             }
-        }
-        for (bin, path) in bins {
-            context.fill(path, with: .color(StarColor.color(bin: bin).color(dark: true)))
         }
         // The reticle glides to a new pick, pulses once on arrival, then follows it.
         var reticleHalf: CGFloat = 0
