@@ -19,6 +19,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
 
     private let horizons = HorizonsPlanetAPIService()
     private let boundary = LaniakeaBoundarySource()
+    private let flowSource = CosmicFlowSource()
 
     private static let catalogAge: TimeInterval = 180 * 86400
     private static let exoplanetAge: TimeInterval = 7 * 86400
@@ -29,8 +30,20 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
 
     // MARK: Laniakea
 
+    func laniakeaFlow() async throws -> LaniakeaFlow {
+        try await cached(DiskCache<LaniakeaFlow>(name: "laniakea-flow-v2"), maxAge: Self.catalogAge) {
+            async let fieldTask = self.flowSource.loadField()
+            async let gridTask = self.boundary.loadGrid()
+            let (field, grid) = try await (fieldTask, gridTask)
+            // Tracing a few thousand flow lines takes a moment, so it's done once and cached.
+            return await Task.detached(priority: .userInitiated) {
+                LaniakeaFlow(field: field, laniakeaCells: grid.cellCentres())
+            }.value
+        }
+    }
+
     func laniakea() async throws -> LaniakeaMap {
-        try await cached(DiskCache<LaniakeaMap>(name: "laniakea-map-v4"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<LaniakeaMap>(name: "laniakea-map-v7"), maxAge: Self.catalogAge) {
             async let gridTask = self.boundary.loadGrid()
             async let colorsTask = self.galaxyColors()
             async let rowsTask = TAPClient.vizier.query("""
@@ -78,17 +91,20 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
             let groups = inside.map { c -> GalaxyGroup in
                 let galaxy = galaxyNames[c.id] ?? "PGC \(c.id)"
                 let named = clusterNames[c.id]
-                // SIMBAD has no single entry for the Local Group to match, so name it from its leader, Andromeda.
-                let name = c.id == GalaxyGroup.localGroupID ? "Local Group" : named?.name ?? (c.count > 1 ? "\(galaxy) group" : galaxy)
+                // Cosmicflows-4's entry here is only Andromeda's half of the Local Group; the Milky
+                // Way's half isn't listed. So it's named for Andromeda, not the whole Local Group.
+                let name = c.id == GalaxyGroup.localGroupID ? "Andromeda group" : named?.name ?? (c.count > 1 ? "\(galaxy) group" : galaxy)
                 return GalaxyGroup(id: c.id, name: name, galaxyCount: c.count, distanceMpc: c.distance,
                                    position: c.position, isOnBoundary: c.edge, isCluster: named?.isCluster ?? false,
-                                   color: colors.color(pgc: c.id, morphology: leaderTypes[c.id]))
+                                   color: colors.color(pgc: c.id, morphology: leaderTypes[c.id]),
+                                   velocityKmS: c.velocity == 0 ? nil : c.velocity)
             }
             let cells = grid.cellCentres()
             return LaniakeaMap(
                 groups: groups, outlineCells: grid.outline(), cellSizeMpc: grid.cellMpc, volumeMpc3: grid.volumeMpc3,
                 longestSpanMpc: grid.longestSpan(), centre: cells.reduce(.zero, +) / Double(max(cells.count, 1)),
-                milkyWayColor: colors.typical[.spiral].map { GalaxyColor(bMinusV: $0, isMeasured: false, typeName: "spiral") }
+                milkyWayColor: colors.typical[.spiral].map { GalaxyColor(bMinusV: $0, isMeasured: false, typeName: "spiral") },
+                cells: cells
             )
         }
     }
@@ -178,12 +194,13 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     // MARK: Exoplanets
 
     func starSystems() async throws -> [StarSystem] {
-        try await cached(DiskCache<[StarSystem]>(name: "exoplanet-hosts-v3"), maxAge: Self.exoplanetAge) {
+        try await cached(DiskCache<[StarSystem]>(name: "exoplanet-hosts-v4"), maxAge: Self.exoplanetAge) {
             // One row per star. sy_pnum counts planets around every star in a multiple system (55 Cnc B
             // would show 7), so count each star's own planets instead.
             let rows = try await TAPClient.exoplanetArchive.query("""
                 select hostname, avg(ra) as ra, avg(dec) as dec, max(sy_dist) as sy_dist, count(*) as planets, \
-                max(st_spectype) as st_spectype, max(st_teff) as st_teff, max(hd_name) as hd_name from pscomppars where sy_dist is not null group by hostname
+                max(st_spectype) as st_spectype, max(st_teff) as st_teff, max(hd_name) as hd_name, \
+                avg(sy_pmra) as pmra, avg(sy_pmdec) as pmdec, avg(st_radv) as rv from pscomppars where sy_dist is not null group by hostname
                 """)
             return try Self.nonEmpty("Stars with planets", rows.compactMap { row in
                 guard let name = row["hostname"], !name.isEmpty,
@@ -195,7 +212,8 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                     spectralType: row["st_spectype"].flatMap { $0.isEmpty ? nil : $0 },
                     temperatureK: row.double("st_teff"),
                     hd: row["hd_name"].flatMap { Int($0.replacingOccurrences(of: "HD", with: "").trimmingCharacters(in: .whitespaces)) },
-                    position: SkyCoordinates.cartesian(longitudeDeg: g.l, latitudeDeg: g.b, distance: d)
+                    position: SkyCoordinates.cartesian(longitudeDeg: g.l, latitudeDeg: g.b, distance: d),
+                    pmRAMasPerYear: row.double("pmra"), pmDecMasPerYear: row.double("pmdec"), radialVelocityKmS: row.double("rv")
                 )
             })
         }
@@ -247,11 +265,12 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     // MARK: Naked-eye stars
 
     func nakedEyeStars() async throws -> [NakedEyeStar] {
-        try await cached(DiskCache<[NakedEyeStar]>(name: "naked-eye-stars-v2"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<[NakedEyeStar]>(name: "naked-eye-stars-v3"), maxAge: Self.catalogAge) {
             // The Bright Star Catalogue's own parallaxes are old, so join the Hipparcos new reduction
             // through the HD numbers in the original Hipparcos catalog.
             async let starsTask = TAPClient.vizier.query("""
-                SELECT b.HR, b.Name, b.HD, b.RAJ2000, b.DEJ2000, b.Vmag, b."B-V", b.SpType, h2.Plx, h2.e_Plx \
+                SELECT b.HR, b.Name, b.HD, b.RAJ2000, b.DEJ2000, b.Vmag, b."B-V", b.SpType, h2.Plx, h2.e_Plx, \
+                h2.pmRA, h2.pmDE, b.pmRA AS bpmRA, b.pmDE AS bpmDE, b.RadVel \
                 FROM "V/50/catalog" AS b LEFT JOIN "I/239/hip_main" AS h ON h.HD = b.HD \
                 LEFT JOIN "I/311/hip2" AS h2 ON h2.HIP = h.HIP WHERE b.Vmag <= 6
                 """)
@@ -284,7 +303,11 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                     bMinusV: row.double("B-V"), spectralType: type?.isEmpty == false ? type : nil,
                     parallaxMas: row.double("Plx"), parallaxErrorMas: row.double("e_Plx"),
                     angularDiameterMas: diameters.value(nearRA: ra, dec: dec),
-                    measuredTemperatureK: temperatures.value(nearRA: ra, dec: dec)
+                    measuredTemperatureK: temperatures.value(nearRA: ra, dec: dec),
+                    // Hipparcos where matched; the Bright Star Catalogue's own are in arcsec/yr.
+                    pmRAMasPerYear: row.double("pmRA") ?? row.double("bpmRA").map { $0 * 1000 },
+                    pmDecMasPerYear: row.double("pmDE") ?? row.double("bpmDE").map { $0 * 1000 },
+                    radialVelocityKmS: row.double("RadVel")
                 )
             }
             return try Self.nonEmpty("Naked-eye stars", stars)

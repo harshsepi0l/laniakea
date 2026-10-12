@@ -26,6 +26,8 @@ final class CosmosViewModel: ObservableObject {
     private var loading = Set<AtlasPlace>()
 
     let exoplanetClock = SimulationClock()
+    /// Years from now for the star and galaxy maps; reset whenever you move to another place.
+    let deepClock = DeepTimeClock()
     private let repo: CosmicRepo
 
     init(repo: CosmicRepo) {
@@ -70,8 +72,11 @@ final class CosmosViewModel: ObservableObject {
             do {
                 switch place {
                 case .laniakea:
+                    async let flowTask = try? repo.laniakeaFlow()
                     let map = try await repo.laniakea()
-                    setScene(await Task.detached { GraphBuilder.laniakea(map) }.value, for: place)
+                    // The flow is extra: the map shows without it if it can't be fetched.
+                    let flow = await flowTask
+                    setScene(await Task.detached { GraphBuilder.laniakea(map, flow: flow) }.value, for: place)
                 case .group(let group):
                     let galaxies = try await repo.galaxies(in: group)
                     let spiral = try? await repo.galaxyColors().typical[.spiral]

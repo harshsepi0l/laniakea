@@ -43,6 +43,11 @@ enum SkyCoordinates {
         return SIMD3(simd_dot(v, a.x), simd_dot(v, a.y), simd_dot(v, a.z))
     }
 
+    /// A Galactic Cartesian vector for an equatorial J2000 one (positions or velocities alike).
+    static func galactic(equatorial v: SIMD3<Double>) -> SIMD3<Double> {
+        SIMD3(simd_dot(galacticRows[0], v), simd_dot(galacticRows[1], v), simd_dot(galacticRows[2], v))
+    }
+
     /// Equatorial J2000 unit vector for a Galactic Cartesian position.
     static func equatorial(galactic g: SIMD3<Double>) -> SIMD3<Double> {
         simd_normalize(galacticRows[0] * g.x + galacticRows[1] * g.y + galacticRows[2] * g.z)
