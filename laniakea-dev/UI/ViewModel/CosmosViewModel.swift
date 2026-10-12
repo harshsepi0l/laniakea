@@ -5,7 +5,7 @@ import Foundation
 @MainActor
 final class CosmosViewModel: ObservableObject {
     /// From the outside in; the last entry is on screen. Starts at home, the Solar System.
-    @Published private(set) var path: [AtlasPlace] = [.laniakea, .milkyWay, .solarSystem]
+    @Published private(set) var path: [AtlasPlace] = [.laniakea, .localGroup, .milkyWay, .solarSystem]
     @Published private(set) var scenes: [AtlasPlace: GraphScene] = [:]
     @Published private(set) var exoplanets: [StarSystem: [Exoplanet]] = [:]
     @Published private(set) var errors: [AtlasPlace: String] = [:]
@@ -40,6 +40,9 @@ final class CosmosViewModel: ObservableObject {
         filter.kinds = []
         if let index = path.firstIndex(of: place) {
             path = Array(path.prefix(through: index))
+        } else if place == .milkyWay {
+            // From elsewhere (the sky view), the Milky Way sits inside the Local Group.
+            path = [.laniakea, .localGroup, .milkyWay]
         } else {
             path.append(place)
         }
@@ -73,15 +76,20 @@ final class CosmosViewModel: ObservableObject {
                 switch place {
                 case .laniakea:
                     async let flowTask = try? repo.laniakeaFlow()
+                    // Tells which Cosmicflows-4 groups are in the Local Group; the map shows without it.
+                    async let localGroupTask = try? repo.localGroup()
                     let map = try await repo.laniakea()
                     // The flow is extra: the map shows without it if it can't be fetched.
-                    let flow = await flowTask
-                    setScene(await Task.detached { GraphBuilder.laniakea(map, flow: flow) }.value, for: place)
+                    let (flow, localGroup) = await (flowTask, localGroupTask)
+                    setScene(await Task.detached { GraphBuilder.laniakea(map, flow: flow, localGroup: localGroup) }.value, for: place)
+                case .localGroup:
+                    async let colorsTask = try? repo.galaxyColors()
+                    let localGroup = try await repo.localGroup()
+                    let colors = await colorsTask
+                    setScene(GraphBuilder.localGroup(localGroup, colors: colors), for: place)
                 case .group(let group):
                     let galaxies = try await repo.galaxies(in: group)
-                    let spiral = try? await repo.galaxyColors().typical[.spiral]
-                    let milkyWay = spiral.map { GalaxyColor(bMinusV: $0, isMeasured: false, typeName: "spiral") }
-                    setScene(GraphBuilder.group(group, galaxies: galaxies, milkyWayColor: milkyWay), for: place)
+                    setScene(GraphBuilder.group(group, galaxies: galaxies), for: place)
                 case .milkyWay:
                     async let systemsTask = repo.starSystems()
                     async let sunTask = try? repo.sun().effectiveTemperatureK

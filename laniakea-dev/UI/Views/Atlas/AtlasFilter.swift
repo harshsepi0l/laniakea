@@ -170,6 +170,8 @@ enum FactSubject: Identifiable, Hashable {
     case laniakea
     case group(GalaxyGroup)
     case galaxy(Galaxy, groupName: String)
+    case localGroup
+    case localGroupGalaxy(LocalGroupGalaxy)
     case milkyWay
     case starSystem(StarSystem)
     case nakedEyeStar(NakedEyeStar)
@@ -182,6 +184,8 @@ enum FactSubject: Identifiable, Hashable {
         case .laniakea: return "laniakea"
         case .group(let g): return "group-\(g.id)"
         case .galaxy(let g, _): return "galaxy-\(g.id)"
+        case .localGroup: return "local-group"
+        case .localGroupGalaxy(let g): return "lg-\(g.id)"
         case .milkyWay: return "milky-way"
         case .starSystem(let s): return "star-\(s.id)"
         case .nakedEyeStar(let s): return "naked-\(s.id)"
@@ -194,6 +198,7 @@ enum FactSubject: Identifiable, Hashable {
         switch place {
         case .laniakea: self = .laniakea
         case .group(let g): self = .group(g)
+        case .localGroup: self = .localGroup
         case .milkyWay: self = .milkyWay
         case .starSystem(let s): self = .starSystem(s)
         case .solarSystem: self = .sun

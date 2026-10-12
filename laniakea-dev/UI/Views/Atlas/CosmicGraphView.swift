@@ -461,7 +461,7 @@ struct CosmicGraphView: View {
         let unitsPerPoint = 1 / (baseScale(size) * rest.zoom)
         let length = Self.niceLength(unitsPerPoint * 90)
         let width = CGFloat(length / unitsPerPoint)
-        let ly = GraphBuilder.lightYearsText(parsecs: length * (scene.unit == .megaparsecs ? 1e6 : 1))
+        let ly = GraphBuilder.lightYearsText(parsecs: length * scene.unit.parsecs)
         return VStack(alignment: .leading, spacing: 4) {
             Rectangle().fill(Color.secondary).frame(width: width, height: 1)
                 .overlay(alignment: .leading) { Rectangle().fill(Color.secondary).frame(width: 1, height: 7) }
