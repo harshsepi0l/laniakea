@@ -88,17 +88,24 @@ final class CosmosViewModel: ObservableObject {
                     let colors = await colorsTask
                     setScene(GraphBuilder.localGroup(localGroup, colors: colors), for: place)
                 case .group(let group):
+                    // Galaxy black holes are extra; the group still opens without them.
+                    async let holesTask = try? repo.supermassiveBlackHoles()
                     let galaxies = try await repo.galaxies(in: group)
-                    setScene(GraphBuilder.group(group, galaxies: galaxies), for: place)
+                    var scene = GraphBuilder.group(group, galaxies: galaxies)
+                    if let holes = await holesTask { GraphBuilder.markBlackHoles(holes, in: &scene) }
+                    setScene(scene, for: place)
                 case .milkyWay:
                     async let systemsTask = repo.starSystems()
                     async let sunTask = try? repo.sun().effectiveTemperatureK
                     // The naked-eye stars are extra; the map still opens without them.
                     async let nakedEyeTask = try? repo.nakedEyeStars()
-                    let (systems, sun, nakedEye) = try await (systemsTask, sunTask, nakedEyeTask)
+                    async let blackHolesTask = try? repo.milkyWayBlackHoles()
+                    let (systems, sun, nakedEye, blackHoles) = try await (systemsTask, sunTask, nakedEyeTask, blackHolesTask)
                     sunTemperatureK = sun ?? sunTemperatureK
                     setScene(await Task.detached {
-                        GraphBuilder.milkyWay(systems, nakedEye: nakedEye ?? [], sunTemperatureK: sun)
+                        var scene = GraphBuilder.milkyWay(systems, nakedEye: nakedEye ?? [], sunTemperatureK: sun)
+                        GraphBuilder.addBlackHoles(blackHoles ?? [], to: &scene)
+                        return scene
                     }.value, for: place)
                 case .starSystem(let system):
                     exoplanets[system] = try await repo.planets(of: system)

@@ -270,7 +270,7 @@ struct CosmicGraphView: View {
             let scale = g.tilts ? 1 : Double(recognizer.scale)
             recognizer.scale = 1
             var state = camera.state
-            let zoom = min(max(state.zoom * scale, 0.5), GraphCameraState.maxZoom)
+            let zoom = min(max(state.zoom * scale, scene.minZoom), GraphCameraState.maxZoom)
             let s = zoom / state.zoom
             // Moving the target toward the pivot by the zoom ratio keeps the pivot exactly where it
             // is on screen, perspective included (the camera's distance shrinks with the zoom).
@@ -359,7 +359,7 @@ struct CosmicGraphView: View {
         var order = scene.nodes.indices.filter { i in
             let n = scene.nodes[i]
             guard isVisible(i), screen.contains(points[i]) else { return false }
-            if n.isHere || i == selected || highlight.contains(i) { return true }
+            if n.isHere || n.isLandmark || i == selected || highlight.contains(i) { return true }
             return n.size >= detailThreshold && !n.name.hasPrefix("PGC ") && !n.name.hasPrefix("HR ")
         }
         order.sort { a, b in

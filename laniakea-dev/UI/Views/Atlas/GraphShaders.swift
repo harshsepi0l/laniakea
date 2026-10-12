@@ -44,7 +44,8 @@ struct Sprite {
     float shape;              // 0 disc, 1 glow, 2 ring, 3 glow sized in layout units, 4 black hole
     float extra;              // glow: multiple of the dot radius; ring: points outside the dot;
                               // shape 3: radius in layout units
-    float width;              // ring line width in points
+    float width;              // ring line width in points; shape 4: if above 0, a badge beside
+                              // a dot of this node size
     float faintable;          // 1: fades when smaller than the detail threshold
 };
 
@@ -131,7 +132,13 @@ vertex SpriteOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
     float extent = radius * ppp + 1.0;
     float2 corner = float2((vid & 1) ? 1.0 : -1.0, (vid & 2) ? 1.0 : -1.0);
 
-    out.position = centre + float4(corner * extent * 2.0 / u.viewport * centre.w, 0, 0);
+    float2 offset = float2(0);
+    if (s.shape == 4 && s.width > 0.0) {
+        // A badge: up and to the right of its host's dot, just clear of it.
+        float host = dotRadius(s.width, u.zoom) * (radius / (dot * s.extra));
+        offset = float2(0.7071, 0.7071) * (host + radius * 0.4) * ppp;
+    }
+    out.position = centre + float4((corner * extent + offset) * 2.0 / u.viewport * centre.w, 0, 0);
     float4 c = s.color;
     c.a *= opacity;
     if (s.faintable > 0.5 && s.size < u.detailThreshold) { c.a *= 0.6; }

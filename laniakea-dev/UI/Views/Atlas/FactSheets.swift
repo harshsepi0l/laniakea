@@ -43,6 +43,8 @@ struct FactSheetData {
     /// How many stars with planets lie in the constellation.
     var constellationHosts: Int?
     var boundaries: ConstellationBoundaries?
+    /// A galaxy's measured central black hole, or the Milky Way's (Sagittarius A*).
+    var blackHole: BlackHole?
 }
 
 enum FactSheetBuilder {
@@ -50,14 +52,15 @@ enum FactSheetBuilder {
         switch subject {
         case .laniakea: return laniakea(data.map)
         case .group(let g): return group(g, data.groupDetails, data.boundaries)
-        case .galaxy(let g, let groupName): return galaxy(g, groupName: groupName, data.galaxyDetails, data.boundaries)
+        case .galaxy(let g, let groupName): return withCentralBlackHole(galaxy(g, groupName: groupName, data.galaxyDetails, data.boundaries), data.blackHole)
         case .localGroup: return localGroup(data.localGroup)
         case .localGroupGalaxy(let g): return localGroupGalaxy(g, data.localGroup, data.boundaries)
-        case .milkyWay: return milkyWay(data.systems, sun: data.sun, colors: data.galaxyColors)
+        case .milkyWay: return withCentralBlackHole(milkyWay(data.systems, sun: data.sun, colors: data.galaxyColors), data.blackHole)
         case .starSystem(let s): return star(s, data.starDetails, data.boundaries, brightStar: data.brightStar)
         case .nakedEyeStar(let s): return nakedEyeStar(s, data.boundaries)
         case .constellation(let abbreviation): return constellation(abbreviation, data.constellation, hosts: data.constellationHosts)
         case .sun: return sun(data.sun)
+        case .blackHole(let h): return blackHole(h, data.boundaries)
         }
     }
 

@@ -31,7 +31,7 @@ struct GraphNode: Identifiable {
     let position: SIMD2<Double>
     /// 0…1, sets the dot size.
     let size: Double
-    let subtitle: String
+    var subtitle: String
     /// Where tapping "Open" goes, if this node has an inside view.
     let opens: AtlasPlace?
     var isHere = false
@@ -51,6 +51,12 @@ struct GraphNode: Identifiable {
     var velocity: SIMD3<Double>?
     /// Drawn as a black hole (a black disc with white swirls) rather than a glowing dot.
     var isBlackHole = false
+    /// Carries a small black-hole badge beside its dot: a galaxy with a measured central black hole.
+    var hasBlackHole = false
+    /// Other names search finds it by, besides `name`.
+    var searchTerms: [String] = []
+    /// Named at any zoom, like where you are (the Galactic Centre on the star map).
+    var isLandmark = false
 
     /// Where it is `years` from now (straight-line motion).
     func position(atYears years: Double) -> SIMD3<Double> {
@@ -60,7 +66,7 @@ struct GraphNode: Identifiable {
 
 /// Everything a graph view draws for one place.
 struct GraphScene {
-    let nodes: [GraphNode]
+    var nodes: [GraphNode]
     /// Pairs of node indices, Obsidian-style links.
     let links: [(Int, Int)]
     /// Unit of `position`, for the scale bar.
@@ -95,6 +101,9 @@ struct GraphScene {
     /// How fast the shaded region grows with the expansion of space, per year, about the origin
     /// (the Milky Way); 0 for none.
     var regionExpansionPerYear: Double = 0
+    /// How far out a pinch may zoom; below 0.5 where something worth finding lies far beyond the
+    /// first view (the Galactic Centre, 8 kpc from the Sun, on the star map).
+    var minZoom: Double = 0.5
 
     /// A place's simulation: what it runs, how far it stays accurate, and its speeds.
     struct Motion {

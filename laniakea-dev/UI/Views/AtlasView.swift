@@ -354,9 +354,17 @@ struct AtlasView: View {
             guard let scene = cosmos.scenes[cosmos.current] else { return [] }
             let visible = cosmos.visibility(for: cosmos.current)
             return scene.nodes.indices
-                .filter { (visible?[$0] ?? true) && scene.nodes[$0].name.localizedCaseInsensitiveContains(query) }
+                .filter { i in
+                    let n = scene.nodes[i]
+                    return (visible?[i] ?? true) && (n.name.localizedCaseInsensitiveContains(query)
+                        || n.searchTerms.contains { $0.localizedCaseInsensitiveContains(query) })
+                }
                 .map { scene.nodes[$0] }
-                .sorted { $0.size > $1.size }
+                // Name matches first, then other names (such as "black hole").
+                .sorted { a, b in
+                    let na = a.name.localizedCaseInsensitiveContains(query), nb = b.name.localizedCaseInsensitiveContains(query)
+                    return na != nb ? na : a.size > b.size
+                }
                 .prefix(8)
                 .map { node in
                     SearchMatch(id: node.id, name: node.name, kind: node.subtitle) { focusID = node.id }
