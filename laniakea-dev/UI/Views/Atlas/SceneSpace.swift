@@ -7,7 +7,7 @@ struct SceneSpace {
     /// interpolated so eccentric orbits keep their shape.
     private let anchors: [(au: Double, scene: Double)]
 
-    let outerRadius: Double
+    private(set) var outerRadius: Double
 
     private static let firstRing = 1.4
     private static let innerStep = 0.6
@@ -15,20 +15,29 @@ struct SceneSpace {
     /// Extra room for the asteroid belt between the rocky planets and the giants.
     private static let beltStep = 1.0
     private static let beltAU = 2.5
+    /// Bodies in the asteroid belt (Ceres) get no ring of their own; they sit in the belt's gap.
+    private static let beltRange = 2.0...4.5
+    /// Beyond Neptune, rings for the dwarf planets are packed closer so the planets stay large.
+    private static let kuiperStep = 0.35
+    private static let neptuneAU = 25.0
 
-    init(semiMajorAxesAU: [Double]) {
+    /// `farthestAU` widens the view for a body whose orbit reaches well past its own ring (Eris is
+    /// near aphelion, 96 au, while its ring is at 68 au).
+    init(semiMajorAxesAU: [Double], farthestAU: Double? = nil) {
         var anchors: [(au: Double, scene: Double)] = [(0, 0)]
-        for au in semiMajorAxesAU.sorted() {
+        for au in semiMajorAxesAU.sorted() where !Self.beltRange.contains(au) {
             guard let last = anchors.last else { continue }
             let step: Double
             if last.au == 0 { step = Self.firstRing }
             else if last.au < Self.beltAU && au > Self.beltAU { step = Self.beltStep }
+            else if last.au > Self.neptuneAU { step = Self.kuiperStep }
             else { step = au < Self.beltAU ? Self.innerStep : Self.outerStep }
             anchors.append((au, last.scene + step))
         }
         if anchors.count < 2 { anchors.append((1, Self.firstRing)) }
         self.anchors = anchors
         outerRadius = anchors[anchors.count - 1].scene
+        if let farthestAU { outerRadius = max(outerRadius, distance(au: farthestAU)) }
     }
 
     func distance(au: Double) -> Double {

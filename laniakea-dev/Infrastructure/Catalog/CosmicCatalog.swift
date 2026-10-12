@@ -532,7 +532,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     }
 
     /// A fresh cached value, else a new fetch (saved), else a stale cached value.
-    private func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
+    func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
         if let fresh = cache.load(maxAge: maxAge) { return fresh }
         do {
             let value = try await fetch()

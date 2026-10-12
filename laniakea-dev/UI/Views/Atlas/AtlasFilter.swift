@@ -13,6 +13,7 @@ enum ObjectKind: String, CaseIterable, Hashable {
     case earthSize, superEarth, neptuneSize, jupiterSize, largerThanJupiter, unknownSize
     // Solar System
     case rocky, giant
+    case dwarfPlanet
 
     var label: String {
         switch self {
@@ -43,6 +44,7 @@ enum ObjectKind: String, CaseIterable, Hashable {
         case .unknownSize: return "Size unknown"
         case .rocky: return "Rocky planets"
         case .giant: return "Giant planets"
+        case .dwarfPlanet: return "Dwarf planets"
         }
     }
 
