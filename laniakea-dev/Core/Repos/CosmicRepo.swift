@@ -1,4 +1,4 @@
-protocol CosmicRepo {
+protocol CosmicRepo: BlackHoleRepo {
     /// Galaxy groups inside Laniakea, with its outline.
     func laniakea() async throws -> LaniakeaMap
     /// How matter flows through Laniakea, and the cosmic web around it (Cosmicflows-4).

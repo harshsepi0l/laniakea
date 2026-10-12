@@ -9,6 +9,8 @@ enum ObjectKind: String, CaseIterable, Hashable {
     // Stars: which set they belong to, then spectral class
     case withPlanets, nakedEye
     case hotStar, fStar, gStar, kStar, mStar, brownDwarf, whiteDwarf, unknownStar
+    // Black holes, and galaxies with a measured central one
+    case blackHole
     // Planets around other stars, by size
     case earthSize, superEarth, neptuneSize, jupiterSize, largerThanJupiter, unknownSize
     // Solar System
@@ -35,6 +37,7 @@ enum ObjectKind: String, CaseIterable, Hashable {
         case .brownDwarf: return "Brown dwarfs"
         case .whiteDwarf: return "White dwarfs"
         case .unknownStar: return "Type unknown"
+        case .blackHole: return "Black holes"
         case .earthSize: return "Earth-size"
         case .superEarth: return "Super-Earths"
         case .neptuneSize: return "Neptune-size"
@@ -176,6 +179,7 @@ enum FactSubject: Identifiable, Hashable {
     /// One of the 88 constellations, by IAU abbreviation.
     case constellation(String)
     case sun
+    case blackHole(BlackHole)
 
     var id: String {
         switch self {
@@ -187,6 +191,7 @@ enum FactSubject: Identifiable, Hashable {
         case .nakedEyeStar(let s): return "naked-\(s.id)"
         case .constellation(let abbreviation): return "constellation-\(abbreviation)"
         case .sun: return "sun"
+        case .blackHole(let b): return "black-hole-\(b.id)"
         }
     }
 

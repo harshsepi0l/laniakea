@@ -526,13 +526,13 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
 
     /// Every group, host star and planet list has at least one entry, so an empty result means the
     /// query went wrong; throwing keeps it out of the cache.
-    private static func nonEmpty<T>(_ what: String, _ items: [T]) throws -> [T] {
+    static func nonEmpty<T>(_ what: String, _ items: [T]) throws -> [T] {
         guard !items.isEmpty else { throw CatalogError.unreadable(what) }
         return items
     }
 
     /// A fresh cached value, else a new fetch (saved), else a stale cached value.
-    private func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
+    func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
         if let fresh = cache.load(maxAge: maxAge) { return fresh }
         do {
             let value = try await fetch()
