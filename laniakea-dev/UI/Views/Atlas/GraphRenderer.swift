@@ -45,6 +45,8 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
     private var links: MTLBuffer?, linkCount = 0
     private var edges: MTLBuffer?, edgeCount = 0
     private var contours: MTLBuffer?, contourCount = 0
+    /// A faint floor in 3D: rings and spokes on the layout plane, so tilt and depth read at once.
+    private var floor: MTLBuffer?, floorCount = 0
     /// Cosmic flow lines and web: in 3D through the region, and flat in the layout plane.
     private var flow: MTLBuffer?, flowCount = 0
     private var planeFlow: MTLBuffer?, planeFlowCount = 0
@@ -190,6 +192,29 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
         func expansion3(_ p: SIMD3<Double>) -> SIMD3<Float> {
             SIMD3(Float(p.x), Float(p.y), Float(p.z)) * Float(scene.regionExpansionPerYear)
         }
+        // The floor: rings every quarter of the fit radius out to twice it, and twelve spokes,
+        // centred on the place's middle.
+        var floorSegments: [SegmentData] = []
+        let floorColor = palette.ink.withAlpha(dark ? 0.1 : 0.12)
+        let ringStep = scene.fitRadius / 4
+        for ring in 1...8 {
+            let r = ringStep * Double(ring)
+            let steps = 96
+            for k in 0..<steps {
+                let a0 = Double(k) / Double(steps) * 2 * .pi, a1 = Double(k + 1) / Double(steps) * 2 * .pi
+                floorSegments.append(SegmentData(color: floorColor,
+                                                 a: SIMD3(Float(cos(a0) * r), Float(sin(a0) * r), 0),
+                                                 b: SIMD3(Float(cos(a1) * r), Float(sin(a1) * r), 0),
+                                                 velocityA: .zero, velocityB: .zero, width: ring % 2 == 0 ? 0.9 : 0.5, soft: 0))
+            }
+        }
+        for spoke in 0..<12 {
+            let a = Double(spoke) / 12 * 2 * .pi, r = ringStep * 8
+            floorSegments.append(SegmentData(color: floorColor, a: .zero, b: SIMD3(Float(cos(a) * r), Float(sin(a) * r), 0),
+                                             velocityA: .zero, velocityB: .zero, width: 0.5, soft: 0))
+        }
+        (floor, floorCount) = buffer(floorSegments, device: device)
+
         (contours, contourCount) = buffer(scene.regionContours.map { a, b in
             SegmentData(color: palette.here.withAlpha(0.3), a: position3(a), b: position3(b),
                         velocityA: expansion3(a), velocityB: expansion3(b), width: 1, soft: 0)
@@ -250,6 +275,8 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
         // objects with no measured color are grey.
         var glows: [SpriteData] = [], dimmed: [SpriteData] = [], muted: [SpriteData] = [], normal: [SpriteData] = []
         var accents: [SpriteData] = [], rings: [SpriteData] = []
+        // White on a dark page; a dark colour tells the shader to add a patch of night sky on a light one.
+        let blackHoleColor: SIMD4<Float> = dark ? SIMD4(1, 1, 1, 1) : SIMD4(0, 0, 0, 1)
         for (i, n) in scene.nodes.enumerated() where isVisible(i) {
             let p = position(n.position, depth: n.depth)
             let v = velocity(n.velocity)
@@ -259,7 +286,7 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
             if n.isBlackHole {
                 // Its own look, drawn over the stars around it, with an orange ring like any pick
                 // when selected.
-                accents.append(SpriteData(color: SIMD4(1, 1, 1, selected != nil && !highlight.contains(i) ? 0.35 : 1),
+                accents.append(SpriteData(color: blackHoleColor.withAlpha(selected != nil && !highlight.contains(i) ? 0.35 : 1),
                                          position: p, velocity: v, size: max(size, 0.5), shape: 4, extra: 6.5))
                 if isAccent {
                     rings.append(SpriteData(color: palette.here, position: p, velocity: v, size: max(size, 0.5), shape: 2, extra: 22, width: 1.6))
@@ -268,7 +295,7 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
             }
             if n.hasBlackHole {
                 // A small black hole beside the dot (offset in the shader), so the galaxy keeps its own.
-                accents.append(SpriteData(color: SIMD4(1, 1, 1, selected != nil && !highlight.contains(i) ? 0.35 : 1),
+                accents.append(SpriteData(color: blackHoleColor.withAlpha(selected != nil && !highlight.contains(i) ? 0.35 : 1),
                                           position: p, velocity: v, size: 0.2, shape: 4, extra: 6.5, width: max(size, 0.01)))
             }
             if isAccent || n.size > 0.55 {
@@ -349,7 +376,8 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
             if let clock, let motion = scene.motion {
                 linkOpacity = Float(max(0, 1 - abs(clock.years) / (motion.reliableYears * 0.5)))
             }
-            for (buffer, count, opacity) in [(edges, edgeCount, flatness * boundary), (contours, contourCount, (1 - flatness) * boundary),
+            for (buffer, count, opacity) in [(floor, floorCount, 1 - flatness),
+                                             (edges, edgeCount, flatness * boundary), (contours, contourCount, (1 - flatness) * boundary),
                                              (planeFlow, planeFlowCount, flatness * flowShown), (flow, flowCount, (1 - flatness) * flowShown),
                                              (links, linkCount, linkOpacity)] {
                 guard let buffer, count > 0, opacity > 0 else { continue }

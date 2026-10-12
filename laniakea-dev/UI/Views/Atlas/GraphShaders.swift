@@ -128,6 +128,8 @@ vertex SpriteOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
         float nearness = clamp(u.perspective / centre.w, 0.6, 1.8);
         radius *= nearness; inner *= nearness; outer *= nearness;
     }
+    // Depth fog in 3D: the far side fades, so what's near reads as near.
+    float fog = u.perspective > 0.0 ? clamp(pow(clamp(u.perspective / centre.w, 0.01, 2.0), 1.5), 0.3, 1.0) : 1.0;
     // One extra pixel all round for antialiasing.
     float extent = radius * ppp + 1.0;
     float2 corner = float2((vid & 1) ? 1.0 : -1.0, (vid & 2) ? 1.0 : -1.0);
@@ -140,7 +142,7 @@ vertex SpriteOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
     }
     out.position = centre + float4((corner * extent + offset) * 2.0 / u.viewport * centre.w, 0, 0);
     float4 c = s.color;
-    c.a *= opacity;
+    c.a *= opacity * fog;
     if (s.faintable > 0.5 && s.size < u.detailThreshold) { c.a *= 0.6; }
     out.color = c;
     out.local = corner * extent;
@@ -172,8 +174,14 @@ fragment float4 spriteFragment(SpriteOut in [[stage_in]]) {
         float white = max(ring, swirl) * o;
         // Black behind the swirl, so it reads on light backgrounds too.
         float body = (d < core + 1.0 ? 1.0 : 0.0) * o;
-        float alpha = max(white, body);
-        return float4(float3(white), alpha);
+        // In light mode (a dark colour is passed) the white swirls sit on a small patch of night
+        // sky, or they'd vanish on the white page.
+        float sky = in.color.r < 0.5 ? saturate((in.radius - d) / 3.0) * 0.92 * o : 0.0;
+        float alpha = max(max(white, body), sky);
+        float3 skyColour = float3(0.04, 0.05, 0.08);
+        // Premultiplied: white swirls over the black disc and the sky patch.
+        float3 rgb = float3(white) + skyColour * max(sky - white, 0.0) * (d < core + 1.0 ? 0.0 : 1.0);
+        return float4(rgb, alpha);
     }
     if (in.shape == 1) {
         // Fades linearly to clear at the edge, like the radial gradient it replaces.

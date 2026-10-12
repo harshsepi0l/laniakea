@@ -311,6 +311,8 @@ struct CosmicGraphView: View {
         guard state.is3D != on else { return }
         state.tilt = on ? GraphCameraState.tilt3D : 0
         if on {
+            // Swing round a little on the way in: the motion shows the depth.
+            state.yaw += 0.45
             // Centre on the place's 3D middle, zoomed out enough to hold all of it.
             state.target.z = scene.fitDepth
             if let r = scene.fitRadius3D { state.zoom = min(state.zoom, scene.fitRadius / r) }
