@@ -1,0 +1,28 @@
+{
+  "id": 40354,
+  "title": "ESA Astronaut Sophie Adenot Returns to Earth After Record European Mission",
+  "summary": "ESA astronaut Sophie Adenot has returned to Earth after 237 days aboard the International Space Station, the longest spaceflight by a European astronaut so far. She now begins recovery and readjustment to life on Earth.",
+  "sections": [
+    {
+      "heading": "A Long Stay in Orbit",
+      "body": "Sophie Adenot spent 237 days aboard the International Space Station, completing more than 3,700 orbits around Earth. That makes hers the longest mission in space by a European astronaut to date."
+    },
+    {
+      "heading": "Handover and Splashdown",
+      "body": "After handing over to the incoming Crew-13, Adenot and her Crew-12 crewmates undocked from the station on 7 October. They splashed down off the coast of California the following day."
+    },
+    {
+      "heading": "Readjusting to Life on Earth",
+      "body": "Adenot is now back in Europe, where she will begin post-flight data collection and rehabilitation. This process helps her readjust to life on Earth after such a long time in space."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/ESA_Multimedia/Videos/2026/10/Welcome_home_Sophie_Adenot",
+    "original_title": "Welcome home, Sophie Adenot"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/videos/2026/10/welcome_home_sophie_adenot/27571908-1-eng-GB/Welcome_home_Sophie_Adenot_card_full.png",
+  "published_at": "2026-10-12T13:00:00Z",
+  "generated_at": "2026-10-12T16:34:33+00:00",
+  "model": "claude-sonnet-5-5"
+}

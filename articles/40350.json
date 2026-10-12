@@ -1,0 +1,32 @@
+{
+  "id": 40350,
+  "title": "ExoMars Rover Twin Practices Driving Off Its Lander",
+  "summary": "A full-size twin of ESA's Rosalind Franklin rover rehearsed leaving its landing platform more than 20 times in Mars-like test conditions on Earth. The exit is one of the most critical moments of the mission, and the tests help engineers prepare for the real thing in 2030.",
+  "sections": [
+    {
+      "heading": "A Critical First Step",
+      "body": "Before Rosalind Franklin can explore Mars, it must get off its lander. A twin model named Amalia rehearsed this by driving off a mock-up landing platform onto simulated martian terrain over 20 times during a two-month test campaign. The tests were run by teams from Thales Alenia Space, the mission's industrial prime contractor, at ALTEC's facilities in Turin, Italy."
+    },
+    {
+      "heading": "Choosing the Safe Exit",
+      "body": "This operation, called egress, is a carefully choreographed procedure rather than just a drive down a ramp. The platform has two pairs of ramps, one at the front and one at the back, and ground control on Earth must decide which is safest. Because the team will only have orbital images to go on, one exit could turn out to be blocked by rocks or slopes. ESA's Eric Zekri notes that once the rover egresses there is no way back, so the team will have only one chance."
+    },
+    {
+      "heading": "Recreating Martian Conditions",
+      "body": "Engineers added challenges in stages. A ceiling lifting device carried two-thirds of the rover's 300 kg Earth weight to mimic Mars gravity, which is about one-third of Earth's. A hydraulic platform then tilted the rover and its lander module by 20 degrees, and obstacles were placed under the ramps as if the lander had come to rest on a boulder or slope. The team also practised the most extreme scenarios by leaving the ramps from both sides."
+    },
+    {
+      "heading": "Ramps Pass the Test",
+      "body": "The three-metre-long ramps were developed by the Polish company Astronika and are made of aluminium with a honeycomb pattern for better grip. ESA engineer Chiara Lombardi says their excellent performance reflects the quality of the design. The campaign gave engineers operational experience that will help keep the rover safe when its real journey on Mars begins in 2030."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/ExoMars_rover_twin_rehearses_first_drive",
+    "original_title": "ExoMars rover twin rehearses first drive"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2026/10/mars_rover_rolls_down_the_ramp/27567393-1-eng-GB/Mars_rover_rolls_down_the_ramp_card_full.jpg",
+  "published_at": "2026-10-12T09:30:00Z",
+  "generated_at": "2026-10-12T16:34:40+00:00",
+  "model": "claude-sonnet-5-5"
+}

@@ -1,0 +1,32 @@
+{
+  "id": 40352,
+  "title": "ESA Introduces NovaMoon to Improve Navigation and Timing on the Moon",
+  "summary": "ESA's NovaMoon mission will place navigation, timing and reference instruments on the lunar surface to enable sub-metre positioning. It matters because many more lunar missions are planned and they will need Moon-based navigation infrastructure.",
+  "sections": [
+    {
+      "heading": "Navigation for the Moon",
+      "body": "NovaMoon is an ESA mission designed to improve positioning, navigation and timing (PNT) services on the Moon. The goal is to help rovers, landers and astronauts find their way much as cars, planes and pedestrians do on Earth. With more lunar missions planned in the coming years, dedicated navigation and communications infrastructure is needed."
+    },
+    {
+      "heading": "Building on Moonlight",
+      "body": "ESA is already working on lunar PNT through Lunar Pathfinder, planned to launch in 2027, and Moonlight. Moonlight will use a dedicated constellation of satellites around the Moon to support precise, autonomous landings and surface mobility. NovaMoon builds on it by providing differential corrections and the first lunar time reference laboratory and selenodetic (Moon measuring) reference station on the surface, aiming for sub-metre positioning."
+    },
+    {
+      "heading": "What the Instruments Will Do",
+      "body": "NovaMoon's instruments will generate correction messages, much like the stations on Earth that do this for Galileo, enabling sub-metre positioning across the Moon's south pole. They will also support a Lunar Reference Frame by co-locating four ranging instruments, which lets the station's location be calculated to within a few centimetres. The payload will carry the first atomic clocks on the lunar surface, contributing to Lunar Reference Time. It will also enable research on the Moon's composition and interior, plus experiments on general relativity and fundamental physics."
+    },
+    {
+      "heading": "Three Versions, Long Operation",
+      "body": "NovaMoon will arrive in three incremental versions on various lunar landers, with the third reaching the full configuration and aimed to fly on Argonaut 2. This step-by-step approach lets ESA test new technologies first and makes the mission more reliable. While most lunar missions last only one lunar day, or 14 Earth days, the NovaMoon payload will support two years of operation, with a possible extension to five."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/Applications/Satellite_navigation/Introducing_NovaMoon",
+    "original_title": "Introducing NovaMoon"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2026/10/novamoon_mission_patch/27569359-1-eng-GB/NovaMoon_mission_patch_card_full.png",
+  "published_at": "2026-10-12T07:11:00Z",
+  "generated_at": "2026-10-12T16:34:54+00:00",
+  "model": "claude-sonnet-5-5"
+}

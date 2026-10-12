@@ -1,0 +1,28 @@
+{
+  "id": 40349,
+  "title": "Engineers Rehearse Rosalind Franklin's First Drive on Mars",
+  "summary": "ESA engineers are practicing on Earth how the Rosalind Franklin rover will leave its lander and begin exploring Mars. The rehearsal helps prepare for the real descent in 2030.",
+  "sections": [
+    {
+      "heading": "Getting Off the Lander",
+      "body": "Before Rosalind Franklin can begin exploring Mars, it first has to get off the lander that carries it there. That first drive is a critical step, so engineers are practicing it well ahead of time."
+    },
+    {
+      "heading": "A Full-Size Rehearsal",
+      "body": "The team is using a full-size model of the rover together with terrain designed to resemble the surface of Mars. The test recreates several challenges the rover will meet on the Red Planet. These include reduced gravity, a 20-degree incline, uneven ground, and obstacles beneath its ramps."
+    },
+    {
+      "heading": "The Real Journey in 2030",
+      "body": "In 2030, Rosalind Franklin will make this same journey for real on Mars. The rehearsals on Earth are meant to prepare for that moment."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/ESA_Multimedia/Videos/2026/10/Preparing_for_a_first_drive_on_Mars",
+    "original_title": "Preparing for a first drive on Mars"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/videos/2026/10/preparing_for_a_first_drive_on_mars/27569566-1-eng-GB/Preparing_for_a_first_drive_on_Mars_card_full.png",
+  "published_at": "2026-10-12T09:00:00Z",
+  "generated_at": "2026-10-12T16:34:43+00:00",
+  "model": "claude-sonnet-5-5"
+}

@@ -1,0 +1,28 @@
+{
+  "id": 40348,
+  "title": "Engineers Rehearse Rosalind Franklin Rover's Exit From Its Mars Lander",
+  "summary": "ESA engineers are testing on Earth how the Rosalind Franklin rover will roll off its lander onto Mars. The rehearsal matters because the rover can't explore the planet until it completes that first journey.",
+  "sections": [
+    {
+      "heading": "First Step: Leaving the Lander",
+      "body": "Before Rosalind Franklin can begin exploring Mars, it has to get off the lander that carries it. Engineers are practicing this first journey here on Earth so they can understand what the rover will face when it does it for real."
+    },
+    {
+      "heading": "A Realistic Test on Earth",
+      "body": "The rehearsal uses a full-size model of the rover and terrain designed to resemble Mars. The test recreates several challenges the rover will meet on the Red Planet, including reduced gravity, a 20-degree incline, uneven ground and obstacles beneath its ramps."
+    },
+    {
+      "heading": "The Real Journey in 2030",
+      "body": "The Earth-based test is preparation for an event planned for 2030. That is when Rosalind Franklin will make the trip down from its lander on Mars itself."
+    }
+  ],
+  "source": {
+    "name": "ESA",
+    "url": "https://www.esa.int/ESA_Multimedia/Videos/2026/10/Rolling_onto_Mars_-_testing_a_rover_s_lander",
+    "original_title": "Rolling onto Mars - testing a rover’s lander"
+  },
+  "image_url": "https://www.esa.int/var/esa/storage/images/esa_multimedia/videos/2026/10/rolling_onto_mars_-_testing_a_rover_s_lander/27569566-1-eng-GB/Rolling_onto_Mars_-_testing_a_rover_s_lander_card_full.png",
+  "published_at": "2026-10-12T09:00:00Z",
+  "generated_at": "2026-10-12T16:34:47+00:00",
+  "model": "claude-sonnet-5-5"
+}
