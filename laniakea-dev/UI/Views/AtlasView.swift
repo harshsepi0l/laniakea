@@ -517,7 +517,11 @@ struct RoundButton: View {
             }
             .foregroundColor(.primary)
             .frame(width: AtlasChrome.cornerButton, height: AtlasChrome.cornerButton)
-            .atlasGlass(Circle())
+            // The whole circle takes the tap, not just the glyph: a fingertip often lands beside
+            // a short label like "3D". The glass isn't interactive here because interactive glass
+            // inside a button can take the touch itself; the button style gives the press instead.
+            .atlasGlass(Circle(), interactive: false)
+            .contentShape(Circle())
             .overlay(alignment: .topTrailing) {
                 if badge > 0 {
                     Text("\(badge)")
@@ -529,7 +533,7 @@ struct RoundButton: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScale())
         .accessibilityLabel(badge > 0 ? "\(label), \(badge) on" : label)
     }
 }
@@ -683,17 +687,27 @@ struct AtlasSearchField: View {
 
 extension View {
     /// The floating controls' background: Liquid Glass where available, else a blurred material.
-    func atlasGlass<S: Shape>(_ shape: S) -> some View {
-        modifier(AtlasGlass(shape: shape))
+    func atlasGlass<S: Shape>(_ shape: S, interactive: Bool = true) -> some View {
+        modifier(AtlasGlass(shape: shape, interactive: interactive))
+    }
+}
+
+/// A button that shrinks a little while pressed.
+private struct PressScale: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
 private struct AtlasGlass<S: Shape>: ViewModifier {
     let shape: S
+    let interactive: Bool
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: shape)
+            content.glassEffect(.regular.interactive(interactive), in: shape)
         } else {
             content
                 .background(.regularMaterial, in: shape)
