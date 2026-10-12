@@ -49,7 +49,9 @@ struct AtlasView: View {
                         planet: planet,
                         distanceFromSunAU: solarSystemVM.distanceFromSun(planet),
                         distanceFromEarthAU: solarSystemVM.distanceFromEarth(planet),
-                        distanceDateLabel: solarSystemVM.selectionDateLabel
+                        distanceDateLabel: solarSystemVM.selectionDateLabel,
+                        dwarf: solarSystemVM.dwarf(planet),
+                        moons: solarSystemVM.moons
                     )
                 }
         }
@@ -247,16 +249,17 @@ struct AtlasView: View {
             ProgressView().frame(maxHeight: .infinity)
         } else {
             SolarSystemView(
-                planets: solarSystemVM.planets,
+                planets: solarSystemVM.bodies,
                 clock: solarSystemVM.clock,
                 selectedPlanetID: solarSystemVM.selectedPlanet?.id,
                 sunTemperatureK: cosmos.sunTemperatureK,
                 isShown: { planet, date in
                     planet.id == Planet.earthID || cosmos.filter.allows(
-                        kind: ObjectKind.solarSystem(densityGramsPerCm3: planet.densityGramsPerCm3),
+                        kind: solarKind(planet),
                         constellation: constellation(of: planet, at: date)
                     )
                 },
+                dwarfIDs: Set(solarSystemVM.dwarfPlanets.map(\.id)),
                 onSelect: { solarSystemVM.select($0) },
                 showObjects: $showList,
                 is3DOn: $solar3D
@@ -269,10 +272,15 @@ struct AtlasView: View {
     private var filterKinds: [(kind: ObjectKind, count: Int)] {
         guard cosmos.current == .solarSystem else { return cosmos.kindCounts(for: cosmos.current) }
         let date = solarSystemVM.clock.simulatedDate
-        return ObjectKind.counts(solarSystemVM.planets.compactMap { planet in
+        return ObjectKind.counts(solarSystemVM.bodies.compactMap { planet in
             guard cosmos.filter.constellation == nil || constellation(of: planet, at: date) == cosmos.filter.constellation else { return nil }
-            return ObjectKind.solarSystem(densityGramsPerCm3: planet.densityGramsPerCm3)
+            return solarKind(planet)
         })
+    }
+
+    /// Rocky or giant for a planet (by density); dwarf planets are their own kind.
+    private func solarKind(_ planet: Planet) -> ObjectKind? {
+        DwarfPlanets.isDwarf(planet.id) ? .dwarfPlanet : ObjectKind.solarSystem(densityGramsPerCm3: planet.densityGramsPerCm3)
     }
 
     /// Constellations to filter by here; nil where it doesn't apply (all of a star's planets share its constellation).
@@ -284,9 +292,9 @@ struct AtlasView: View {
             guard cosmos.boundaries != nil else { return [] }
             let date = solarSystemVM.clock.simulatedDate
             var counts: [String: Int] = [:]
-            for planet in solarSystemVM.planets {
+            for planet in solarSystemVM.bodies {
                 guard let c = constellation(of: planet, at: date),
-                      cosmos.filter.kinds.isEmpty || ObjectKind.solarSystem(densityGramsPerCm3: planet.densityGramsPerCm3).map(cosmos.filter.kinds.contains) == true
+                      cosmos.filter.kinds.isEmpty || solarKind(planet).map(cosmos.filter.kinds.contains) == true
                 else { continue }
                 counts[c, default: 0] += 1
             }
@@ -346,7 +354,7 @@ struct AtlasView: View {
         switch cosmos.current {
         case .solarSystem:
             return solarSystemVM.planets(matching: query).map { planet in
-                SearchMatch(id: planet.id, name: planet.name, kind: "Planet") { solarSystemVM.select(planet) }
+                SearchMatch(id: planet.id, name: planet.name, kind: DwarfPlanets.isDwarf(planet.id) ? "Dwarf planet" : "Planet") { solarSystemVM.select(planet) }
             }
         case .starSystem:
             return []

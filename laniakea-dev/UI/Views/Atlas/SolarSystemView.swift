@@ -11,6 +11,8 @@ struct SolarSystemView: View {
     var sunTemperatureK: Double? = nil
     /// Whether a planet passes the filter on a date (a planet's constellation changes as it moves).
     var isShown: (Planet, Date) -> Bool = { _, _ in true }
+    /// Which of `planets` are dwarf planets; they're drawn as rings rather than solid dots.
+    var dwarfIDs: Set<String> = []
     let onSelect: (Planet) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -183,7 +185,8 @@ struct SolarSystemView: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     Circle()
-                                        .fill(planet.composition.swiftUI(dark: colorScheme == .dark))
+                                        .fill(planet.composition.swiftUI(dark: colorScheme == .dark).opacity(dwarfIDs.contains(planet.id) ? 0.35 : 1))
+                                        .overlay(Circle().stroke(planet.composition.swiftUI(dark: colorScheme == .dark), lineWidth: dwarfIDs.contains(planet.id) ? 1 : 0))
                                         .frame(width: dotSize(planet), height: dotSize(planet))
                                         .overlay(Circle().stroke(Color.orange, lineWidth: planet.id == selectedPlanetID ? 1.5 : 0).padding(-2))
                                         .frame(width: 14)
@@ -270,7 +273,10 @@ struct SolarSystemView: View {
         TiltCamera(size: size, tilt: t, outerRadius: space.outerRadius)
     }
 
-    private var space: SceneSpace { SceneSpace(semiMajorAxesAU: planets.map(\.orbit.semiMajorAxisAU)) }
+    private var space: SceneSpace {
+        SceneSpace(semiMajorAxesAU: planets.map(\.orbit.semiMajorAxisAU),
+                   farthestAU: planets.map { $0.orbit.semiMajorAxisAU * (1 + $0.orbit.eccentricity) }.max())
+    }
 
     // MARK: Drawing
 
@@ -344,7 +350,13 @@ struct SolarSystemView: View {
                     center: item.point, startRadius: 0, endRadius: glow
                 )
             )
-            context.fill(circle(item.point, item.radius), with: .color(color))
+            if dwarfIDs.contains(item.planet.id) {
+                // Dwarf planets: a ring, so they read as a different kind of body.
+                context.fill(circle(item.point, item.radius), with: .color(color.opacity(0.35)))
+                context.stroke(circle(item.point, item.radius), with: .color(color), lineWidth: 1.2)
+            } else {
+                context.fill(circle(item.point, item.radius), with: .color(color))
+            }
             if selected {
                 context.stroke(circle(item.point, item.radius + 3), with: .color(.orange), lineWidth: 1.6)
             }

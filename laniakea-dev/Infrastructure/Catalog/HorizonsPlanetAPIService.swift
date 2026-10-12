@@ -178,7 +178,7 @@ enum HorizonsParser {
     }
 
     /// The first row of the elements table, matched to its column names (EC, IN, OM, W, MA, N, A, PR...).
-    private static func orbit(from result: String) -> OrbitalElements? {
+    static func orbit(from result: String) -> OrbitalElements? {
         let lines = result.components(separatedBy: .newlines)
         guard let start = lines.firstIndex(of: "$$SOE"), start + 1 < lines.count,
               let header = lines[..<start].last(where: { $0.contains("JDTDB") })
@@ -198,7 +198,7 @@ enum HorizonsParser {
 
     /// "Key = value" pairs from the data sheet between the first two rows of asterisks. Lines hold one
     /// or two columns; a column's value ends where two or more spaces lead into the next key.
-    private static func keyValues(inHeaderOf result: String) -> [(key: String, value: String)] {
+    static func keyValues(inHeaderOf result: String) -> [(key: String, value: String)] {
         let lines = result.components(separatedBy: .newlines)
         let rules = lines.indices.filter { lines[$0].count > 40 && lines[$0].allSatisfy { $0 == "*" } }
         guard rules.count > 1 else { return [] }
@@ -226,7 +226,7 @@ enum HorizonsParser {
     }
 
     /// Durations like "58.6463 d", "24.622962 hr", "17.24+-0.01 h" or "9h 55m 29.711 s", in hours.
-    private static func hours(_ pair: (key: String, value: String)) -> Double? {
+    static func hours(_ pair: (key: String, value: String)) -> Double? {
         let v = pair.value
         if let h = firstMatch(#"(\d+)h\s*\d+m"#, in: v).flatMap(Double.init),
            let m = firstMatch(#"\d+h\s*(\d+)m"#, in: v).flatMap(Double.init) {
@@ -243,11 +243,11 @@ enum HorizonsParser {
         }
     }
 
-    private static func number(in text: String) -> Double? {
+    static func number(in text: String) -> Double? {
         firstMatch(#"(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)"#, in: text).flatMap(Double.init)
     }
 
-    private static func firstMatch(_ pattern: String, in text: String) -> String? {
+    static func firstMatch(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
               match.numberOfRanges > 1,

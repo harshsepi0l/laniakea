@@ -34,7 +34,7 @@ struct SkyCornerMap: View {
 
     private var isSolarSystem: Bool {
         switch selected?.kind {
-        case .planet, .sun: return true
+        case .planet, .sun, .moon: return true
         default: return false
         }
     }
@@ -131,6 +131,8 @@ struct SkyCornerMap: View {
         var target: CGPoint?
         if case .planet(let picked) = selected?.kind { target = screen(picked) }
         if case .sun = selected?.kind { target = centre }
+        // At this scale the Moon sits on Earth.
+        if case .moon = selected?.kind { target = earth }
         if let earth, let target {
             var line = Path(); line.move(to: earth); line.addLine(to: target)
             context.stroke(line, with: .color(here), style: StrokeStyle(lineWidth: 1.3, dash: [3, 3]))
@@ -305,6 +307,7 @@ struct SkyFactsPanel: View {
 
     private func color(_ object: SkyObject) -> Color {
         if case .planet = object.kind { return object.composition.swiftUI(dark: true) }
+        if case .moon = object.kind { return Color(white: 0.9) }
         return StarColor.swiftUI(temperature: object.temperatureK, dark: true)
     }
 
@@ -314,6 +317,7 @@ struct SkyFactsPanel: View {
         case .star(let star, _): return star.properName != nil ? star.designation.map { "\($0) ·" } : nil
         case .planet: return "Planet ·"
         case .sun: return "Our star ·"
+        case .moon: return "Earth's moon ·"
         }
     }
 
@@ -337,6 +341,19 @@ struct SkyFactsPanel: View {
             guard let earth = model.planets.first(where: { $0.id == Planet.earthID }) else { return [] }
             let au = simd_length(earth.orbit.position(at: Date()))
             return [.init(label: "From Earth now", value: "\(au.formatted(.number.precision(.fractionLength(3)))) au")]
+        case .moon(let moon):
+            var facts: [FactSheet.Fact] = [
+                .init(label: "Phase", value: moon.phaseName),
+                .init(label: "Lit", value: "\((moon.illuminatedFraction * 100).formatted(.number.precision(.fractionLength(0))))%"),
+                .init(label: "From you now", value: "\(moon.distanceKm.formatted(.number.precision(.fractionLength(0)))) km"),
+            ]
+            // Whichever comes first.
+            let next = [("Rises", model.moonRiseSet.rise), ("Sets", model.moonRiseSet.set)]
+                .compactMap { label, date in date.map { (label, $0) } }.min { $0.1 < $1.1 }
+            if let (label, date) = next {
+                facts.append(.init(label: label, value: date.formatted(date: .omitted, time: .shortened)))
+            }
+            return facts
         }
     }
 
@@ -352,6 +369,7 @@ struct SkyFactsPanel: View {
         case .star(_, let host?): steps = ["Laniakea", "Milky Way", object.name, host.planetCount == 1 ? "1 planet" : "\(host.planetCount) planets"]
         case .star: steps = ["Laniakea", "Milky Way", object.name]
         case .planet, .sun: steps = ["Milky Way", "Solar System", object.name]
+        case .moon: steps = ["Solar System", "Earth", object.name]
         }
         return HStack(spacing: 5) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, step in

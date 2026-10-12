@@ -21,6 +21,7 @@ struct SkyObject: Identifiable {
         case star(NakedEyeStar, host: StarSystem?)
         case planet(Planet)
         case sun
+        case moon(MoonView)
     }
 
     let id: String
@@ -52,6 +53,10 @@ final class SkyViewModel: NSObject, ObservableObject {
     @Published private(set) var boundaries: ConstellationBoundaries?
     @Published private(set) var nakedEye: [NakedEyeStar] = []
     @Published private(set) var planets: [Planet] = []
+    /// The Moon's physical data sheet from Horizons, for its facts.
+    @Published private(set) var moonDetails: Moon?
+    /// The next moonrise and moonset where you are, within about a day.
+    @Published private(set) var moonRiseSet: (rise: Date?, set: Date?) = (nil, nil)
 
     let pointing = SkyPointing()
     /// Screen orientation relative to the device, so screen up and right map onto device axes.
@@ -60,6 +65,10 @@ final class SkyViewModel: NSObject, ObservableObject {
     private let repo: CosmicRepo & PlanetRepo
     private let locationManager = CLLocationManager()
     private let motion = CMMotionManager()
+    private let bodies: SolarSystemBodiesRepo = CosmicCatalog.shared
+    private var moonEphemeris: MoonEphemeris?
+    private var moonTask: Task<Void, Never>?
+    private var riseSetComputedAt = Date.distantPast
 
     // Drag to look around: altitude and azimuth of the view centre, in degrees.
     private(set) var manualAzimuth = 180.0
@@ -89,6 +98,8 @@ final class SkyViewModel: NSObject, ObservableObject {
 
     func stop() {
         motion.stopDeviceMotionUpdates()
+        moonTask?.cancel()
+        moonTask = nil
     }
 
     private func load() async {
@@ -111,6 +122,7 @@ final class SkyViewModel: NSObject, ObservableObject {
                 )
             }
             updateSolarSystem(date: Date())
+            startMoon()
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? "The sky couldn't be loaded. Check your connection and try again."
         }
@@ -135,6 +147,48 @@ final class SkyViewModel: NSObject, ObservableObject {
             ))
         }
         objects = objects.filter { if case .star = $0.kind { return true } else { return false } } + solar
+    }
+
+    // MARK: The Moon
+
+    /// Loads the Moon's hourly geocentric positions, then places it from where you are every 30
+    /// seconds: it crosses its own width in about an hour, and the shift for your place on Earth
+    /// changes as Earth turns.
+    private func startMoon() {
+        moonTask?.cancel()
+        moonTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                moonEphemeris = try await bodies.moonEphemeris()
+            } catch {
+                return  // The rest of the sky still works without the Moon.
+            }
+            moonDetails = try? await bodies.moon(id: "301")
+            while !Task.isCancelled {
+                updateMoon(date: Date())
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+    }
+
+    private func updateMoon(date: Date) {
+        guard let ephemeris = moonEphemeris, let location,
+              let earth = planets.first(where: { $0.id == Planet.earthID })
+        else { return }
+        let lat = location.coordinate.latitude, lon = location.coordinate.longitude
+        guard let view = MoonSky.view(ephemeris: ephemeris, sunGeocentric: -earth.orbit.position(at: date),
+                                      latitudeDeg: lat, longitudeDeg: lon, altitudeM: location.altitude, date: date)
+        else { return }
+        if date.timeIntervalSince(riseSetComputedAt) > 600 {
+            moonRiseSet = MoonSky.nextRiseAndSet(ephemeris: ephemeris, latitudeDeg: lat, longitudeDeg: lon, from: date)
+            riseSetComputedAt = date
+        }
+        let moon = SkyObject(
+            id: "moon", name: "Moon", kind: .moon(view), equatorial: view.equatorial,
+            // Only weights picking toward it; no magnitude is shown for the Moon.
+            magnitude: -10, temperatureK: nil
+        )
+        if let i = objects.firstIndex(where: { $0.id == "moon" }) { objects[i] = moon } else { objects.append(moon) }
     }
 
     func localSky(at date: Date) -> LocalSky? {
@@ -255,6 +309,7 @@ extension SkyViewModel: CLLocationManagerDelegate {
         Task { @MainActor in
             location = latest
             locationState = .ready
+            updateMoon(date: Date())
         }
     }
 
