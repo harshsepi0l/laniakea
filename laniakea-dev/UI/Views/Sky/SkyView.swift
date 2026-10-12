@@ -1,9 +1,10 @@
 import simd
 import SwiftUI
 
-/// Point the iPad at the sky: the camera with every naked-eye star, the planets and the Sun drawn
-/// where they really are. Aim at something, or tap it, and a reticle locks onto it; it gets a live
-/// corner map showing where it lives in Atlas, and its facts at the bottom.
+/// Point the device at the sky: the camera with every naked-eye star, the planets and the Sun drawn
+/// where they really are. Aim at something, or tap it, and a reticle finds it; the lock button keeps
+/// the reticle on it wherever you point next. It gets a live corner map showing where it lives in
+/// Atlas, and its facts.
 struct SkyView: View {
     /// Leave the sky and show a place in Atlas, optionally focusing one of its objects.
     let onOpenInAtlas: (AtlasPlace, String?) -> Void
@@ -19,7 +20,16 @@ struct SkyView: View {
     @State private var dragStart: CGSize?
     @State private var zoomStart: Double?
     /// A tapped pick stays until you tap empty sky; otherwise whatever is nearest the middle is picked.
+    @State private var isHeld = false
+    /// Locked with the button: the reticle stays on the pick wherever you point, until unlocked.
     @State private var isLocked = false
+    @State private var isPanelExpanded = false
+    /// Set in Settings: the camera picture behind the sky, the corner map, the facts bubble, and
+    /// the lock button.
+    @AppStorage("sky.showsCamera") private var showsCamera = true
+    @AppStorage("sky.showsMap") private var showsMap = true
+    @AppStorage("sky.showsFacts") private var showsFacts = true
+    @AppStorage("sky.showsLock") private var showsLock = true
     private let cache = SkyDirectionCache()
     private let reticle = Reticle()
 
@@ -27,8 +37,9 @@ struct SkyView: View {
         GeometryReader { geo in
             ZStack {
                 Color(red: 0.016, green: 0.024, blue: 0.043).ignoresSafeArea()
-                if model.usesMotion {
-                    // Hidden while the view is dragged away from where the camera points.
+                if model.usesMotion, showsCamera {
+                    // Hidden while the view is dragged away from where the camera points. Turned off
+                    // in Settings, the camera stops and only the sky is drawn, still following the device.
                     CameraPreview(interfaceOrientation: orientation) { optics = $0 }
                         .ignoresSafeArea()
                         .opacity(model.isDragged ? 0 : 1)
@@ -43,12 +54,15 @@ struct SkyView: View {
                 .ignoresSafeArea()
                 .gesture(lookAroundGesture(size: geo.size))
                 .simultaneousGesture(zoomGesture)
-                .simultaneousGesture(SpatialTapGesture().onEnded { tap(at: $0.location, size: geo.size) })
+                // In screen coordinates, the same ones the sky is drawn in; the view's own would be
+                // shifted by the safe area (sideways in landscape).
+                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap(at: $0.location, size: geo.size) })
 
                 overlays(size: geo.size)
             }
             .onChange(of: geo.size) { _, _ in readOrientation() }
             .onChange(of: selectedID) { _, id in reticle.retarget(to: id) }
+            .onChange(of: showsLock) { _, on in if !on { isLocked = false } }
             .task(id: geo.size) { await pickLoop(size: geo.size) }
         }
         .background(Color.black)
@@ -76,6 +90,7 @@ struct SkyView: View {
     }
 
     private func projection(size: CGSize) -> SkyProjection {
+        // With the camera off, the last optics keep the sky the same size it was over the picture.
         SkyProjection(pointing: model.pointing, size: fullSize(size), optics: model.usesMotion ? optics : nil)
     }
 
@@ -83,13 +98,13 @@ struct SkyView: View {
 
     // MARK: Picking
 
-    /// Every fifth of a second, unless something was tapped, picks the object nearest the middle of
+    /// Every fifth of a second, unless something is held or locked, picks the object nearest the middle of
     /// the view, favouring bright ones and keeping the current pick until something clearly closer
     /// arrives.
     private func pickLoop(size: CGSize) async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(200))
-            guard !isLocked, let sky = model.localSky(at: Date()) else { continue }
+            guard !isLocked, !isHeld, let sky = model.localSky(at: Date()) else { continue }
             let proj = projection(size: size)
             let dirs = cache.directions(for: model.objects, sky: sky)
             let centre = CGPoint(x: proj.size.width / 2, y: proj.size.height / 2)
@@ -108,10 +123,20 @@ struct SkyView: View {
         }
     }
 
-    /// Picks what was tapped (the nearest object within a fingertip, favouring bright ones) and
-    /// holds it; a tap on empty sky lets go.
+    /// Locks the reticle on the current pick, or lets it go.
+    private func toggleLock() {
+        guard isLocked || selectedID != nil else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isLocked.toggle()
+            if !isLocked { isHeld = false }
+        }
+    }
+
+    /// Picks what was tapped (the nearest object within a fingertip; brightness only breaks near
+    /// ties) and holds it; a tap on empty sky lets go. While locked, taps change nothing.
     private func tap(at location: CGPoint, size: CGSize) {
-        guard let sky = model.localSky(at: Date()) else { return }
+        guard !isLocked, let sky = model.localSky(at: Date()) else { return }
         let proj = projection(size: size)
         let dirs = cache.directions(for: model.objects, sky: sky)
         var best: (id: String, score: Double)?
@@ -119,17 +144,12 @@ struct SkyView: View {
             guard let p = proj.point(dir) else { continue }
             let d = Double(hypot(p.x - location.x, p.y - location.y))
             guard d < 44 else { continue }
-            let score = d + 4 * object.magnitude
+            let score = d + 1.5 * object.magnitude
             if score < best?.score ?? .infinity { best = (object.id, score) }
         }
         withAnimation(.easeInOut(duration: 0.2)) {
-            if let best {
-                selectedID = best.id
-                isLocked = true
-            } else {
-                isLocked = false
-                selectedID = nil
-            }
+            selectedID = best?.id
+            isHeld = best != nil
         }
     }
 
@@ -182,9 +202,13 @@ struct SkyView: View {
         if let spot = selectedSpot {
             let now = reticle.current(target: spot.point, half: spot.half, date: date)
             reticleHalf = now.half
-            drawReticle(in: &context, at: now.point, half: now.half, pulse: now.pulse)
+            drawReticle(in: &context, at: now.point, half: now.half, pulse: now.pulse, isLocked: isLocked)
         } else {
             reticle.clear()
+            // A locked or tapped pick that's out of view gets an arrow at the edge pointing to it.
+            if isLocked || isHeld, let i = model.objects.firstIndex(where: { $0.id == selectedID }), i < dirs.count {
+                drawPointer(in: &context, to: dirs[i], name: model.objects[i].name, proj: proj)
+            }
         }
         for (text, p, r, isSelected) in labels {
             let resolved = context.resolve(Text(text).font(.system(size: isSelected ? 13 : 11, weight: isSelected ? .semibold : .regular))
@@ -203,7 +227,8 @@ struct SkyView: View {
     }
 
     /// Four corner brackets around the pick, and a ring that grows and fades when it arrives.
-    private func drawReticle(in context: inout GraphicsContext, at p: CGPoint, half h: CGFloat, pulse: Double?) {
+    /// Locked, the brackets close into a square.
+    private func drawReticle(in context: inout GraphicsContext, at p: CGPoint, half h: CGFloat, pulse: Double?, isLocked: Bool) {
         let arm = min(8, h * 0.6)
         var brackets = Path()
         for (sx, sy) in [(-1.0, -1.0), (1, -1), (1, 1), (-1, 1)] {
@@ -214,11 +239,45 @@ struct SkyView: View {
         }
         context.stroke(brackets, with: .color(.black.opacity(0.5)), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
         context.stroke(brackets, with: .color(here), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        if isLocked {
+            context.stroke(Path(roundedRect: CGRect(x: p.x - h, y: p.y - h, width: h * 2, height: h * 2), cornerRadius: 3),
+                           with: .color(here.opacity(0.55)), lineWidth: 1)
+        }
         if let pulse {
             let radius = h * (1 + CGFloat(pulse))
             context.stroke(Path(ellipseIn: CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)),
                            with: .color(here.opacity(0.7 * (1 - pulse))), lineWidth: 1.5)
         }
+    }
+
+    /// An arrow at the screen's edge toward an object out of view, with its name.
+    private func drawPointer(in context: inout GraphicsContext, to direction: SIMD3<Double>, name: String, proj: SkyProjection) {
+        // Which way to turn: the object's direction across the screen, even when it's behind you.
+        var v = CGVector(dx: simd_dot(direction, proj.right), dy: -simd_dot(direction, proj.up))
+        let length = hypot(v.dx, v.dy)
+        if length < 1e-6 { v = CGVector(dx: 0, dy: 1) } else { v = CGVector(dx: v.dx / length, dy: v.dy / length) }
+        // Kept clear of the controls at the top and bottom.
+        let area = CGRect(x: 36, y: 140, width: proj.size.width - 72, height: proj.size.height - 260)
+        let centre = CGPoint(x: area.midX, y: area.midY)
+        let t = min(v.dx == 0 ? .infinity : area.width / 2 / abs(v.dx), v.dy == 0 ? .infinity : area.height / 2 / abs(v.dy))
+        let tip = CGPoint(x: centre.x + v.dx * t, y: centre.y + v.dy * t)
+        let angle = atan2(v.dy, v.dx)
+        var arrow = Path()
+        arrow.move(to: CGPoint(x: 13, y: 0))
+        arrow.addLine(to: CGPoint(x: -8, y: -10))
+        arrow.addLine(to: CGPoint(x: -3, y: 0))
+        arrow.addLine(to: CGPoint(x: -8, y: 10))
+        arrow.closeSubpath()
+        arrow = arrow.applying(CGAffineTransform(rotationAngle: angle)).applying(CGAffineTransform(translationX: tip.x, y: tip.y))
+        context.fill(arrow, with: .color(here))
+        context.stroke(arrow, with: .color(.black.opacity(0.5)), lineWidth: 1)
+        // The name sits inward from the arrow.
+        let text = context.resolve(Text(name).font(.system(size: 12, weight: .semibold)).foregroundColor(here))
+        let size = text.measure(in: proj.size)
+        let at = CGPoint(x: tip.x - v.dx * (size.width / 2 + 22), y: tip.y - v.dy * (size.height / 2 + 22))
+        let rect = CGRect(x: at.x - size.width / 2, y: at.y - size.height / 2, width: size.width, height: size.height)
+        context.fill(Path(roundedRect: rect.insetBy(dx: -5, dy: -2), cornerRadius: 5), with: .color(.black.opacity(0.6)))
+        context.draw(text, in: rect)
     }
 
     private func glow(_ context: inout GraphicsContext, _ p: CGPoint, _ r: CGFloat, _ color: Color) {
@@ -280,20 +339,45 @@ struct SkyView: View {
                 .accessibilityLabel("Close the sky view")
                 statusPill
                 Spacer(minLength: 8)
-                SkyCornerMap(model: model, selected: selected, projection: { projection(size: size) })
-                    .onTapGesture { openInAtlas() }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Map. Opens in Atlas")
+                if showsMap {
+                    SkyCornerMap(model: model, selected: selected, projection: { projection(size: size) })
+                        .onTapGesture { openInAtlas() }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("Map. Opens in Atlas")
+                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
+            .animation(.easeInOut(duration: 0.2), value: showsMap)
             Spacer()
-            SkyFactsPanel(model: model, object: selected, onFacts: openFacts, onOpenInAtlas: openInAtlas,
-                          onConstellation: { factSubject = .constellation($0) })
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
-                .frame(maxWidth: 560)
+            HStack(alignment: .bottom, spacing: 10) {
+                if showsFacts {
+                    SkyFactsPanel(model: model, object: selected, isExpanded: $isPanelExpanded, onFacts: openFacts,
+                                  onOpenInAtlas: openInAtlas, onConstellation: { factSubject = .constellation($0) })
+                }
+                Spacer(minLength: 0)
+                if showsLock { lockButton }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
         }
+    }
+
+    /// Locks the reticle on the pick, wherever you point next; tap again to unlock.
+    private var lockButton: some View {
+        Button(action: toggleLock) {
+            Image(systemName: isLocked ? "lock.fill" : "lock.open")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundColor(isLocked ? .black : .white)
+                .frame(width: 54, height: 54)
+                .background(isLocked ? here : Color(white: 0.11).opacity(0.9), in: Circle())
+                .overlay(Circle().stroke(Color.white.opacity(isLocked ? 0 : 0.12)))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isLocked && selectedID == nil)
+        .opacity(!isLocked && selectedID == nil ? 0.45 : 1)
+        .accessibilityLabel(isLocked ? "Unlock \(selected?.name ?? "")" : "Lock on \(selected?.name ?? "the pick")")
     }
 
     private var statusPill: some View {
@@ -301,11 +385,12 @@ struct SkyView: View {
             switch model.locationState {
             case .denied:
                 Text("Location is off").font(.system(size: 13, weight: .semibold))
-                Text("Turn it on in Settings to see your sky").font(.system(size: 11))
+                Text("Turn it on in the Settings app to see your sky").font(.system(size: 11))
             case .waiting:
                 Text("Finding where you are…").font(.system(size: 13, weight: .semibold))
             case .ready:
-                Text(isLocked ? "Tap empty sky to let go"
+                Text(isLocked ? "Locked on \(selected?.name ?? "it")"
+                     : isHeld ? "Tap empty sky to let go"
                      : model.isDragged ? "Back to where you point in a moment"
                      : model.usesMotion ? "Point, drag or tap" : "Drag or tap")
                     .font(.system(size: 13, weight: .semibold))
@@ -315,6 +400,9 @@ struct SkyView: View {
             }
             if let error = model.error { Text(error).font(.system(size: 11)) }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
         .foregroundColor(.white)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

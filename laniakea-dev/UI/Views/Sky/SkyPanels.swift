@@ -130,78 +130,144 @@ struct SkyCornerMap: View {
     }
 }
 
-/// The facts panel at the bottom: what's in the crosshair, its key facts, where it lives in Atlas,
-/// and buttons for the full fact sheet and for Atlas.
+/// The facts bubble in the bottom-left corner. Small, it's just what's in the crosshair; tap it to
+/// open a card with its key facts, where it lives in Atlas, and buttons for the full fact sheet and
+/// for Atlas. Tap the card's header (or swipe it down) to shrink it again.
 struct SkyFactsPanel: View {
     @ObservedObject var model: SkyViewModel
     let object: SkyObject?
+    @Binding var isExpanded: Bool
     let onFacts: () -> Void
     let onOpenInAtlas: () -> Void
     /// Opens a constellation's fact sheet, by IAU abbreviation.
     let onConstellation: (String) -> Void
 
+    private var here: Color { Color(red: 1, green: 0.69, blue: 0.36) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let object {
-                header(object)
-                let facts = facts(for: object)
-                if !facts.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                        ForEach(facts) { fact in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(fact.label).font(.system(size: 11)).foregroundColor(Color(white: 0.6))
-                                Text(fact.value).font(.system(size: 15, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-                            }
-                            .padding(.horizontal, 11).padding(.vertical, 9)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12)))
-                        }
-                    }
-                }
-                if case .star(_, let host?) = object.kind {
-                    Button(action: onFacts) {
-                        HStack(spacing: 8) {
-                            Circle().fill(PlanetComposition.gasRich.swiftUI(dark: true)).frame(width: 8, height: 8)
-                            Text(host.planetCount == 1 ? "1 known planet" : "\(host.planetCount) known planets").font(.system(size: 13, weight: .semibold))
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.system(size: 12))
-                        }
-                        .padding(.horizontal, 12).frame(height: 40)
-                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                }
-                if case .sun = object.kind {
-                    Text("Never look at the Sun through a camera or binoculars.")
-                        .font(.system(size: 12, weight: .semibold)).foregroundColor(Color(red: 1, green: 0.69, blue: 0.36))
-                }
-                ladder(object)
-                HStack(spacing: 10) {
-                    Button(action: onFacts) {
-                        Text("Facts").font(.system(size: 16, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 46)
-                            .background(Color.white.opacity(0.12), in: Capsule())
-                    }
-                    Button(action: onOpenInAtlas) {
-                        Text("Open in Atlas").font(.system(size: 16, weight: .semibold)).foregroundColor(.black).frame(maxWidth: .infinity).frame(height: 46)
-                            .background(Color(red: 1, green: 0.69, blue: 0.36), in: Capsule())
-                    }
-                }
-                .buttonStyle(.plain)
+        Group {
+            if let object, isExpanded {
+                card(object)
+                    .transition(.scale(scale: 0.4, anchor: .bottomLeading).combined(with: .opacity))
             } else {
-                Text("Point the crosshair at a star or planet.").font(.system(size: 14)).foregroundColor(Color(white: 0.75))
+                bubble
+                    .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
             }
         }
         .foregroundColor(.white)
-        .padding(16)
-        .background(Color(white: 0.11).opacity(0.94), in: RoundedRectangle(cornerRadius: 26))
         .animation(.easeInOut(duration: 0.2), value: object?.id)
+    }
+
+    /// Just the name, with a dot in its color; tap to open.
+    private var bubble: some View {
+        Button { if object != nil { setExpanded(true) } } label: {
+            HStack(spacing: 9) {
+                if let object {
+                    Circle().fill(color(object)).frame(width: 10, height: 10).shadow(color: color(object).opacity(0.8), radius: 4)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(object.name).font(.system(size: 15, weight: .semibold))
+                        if case .sun = object.kind {
+                            // Kept on the small bubble too: this one matters.
+                            Text("Don't look at it through the camera").font(.system(size: 11, weight: .semibold)).foregroundColor(here)
+                        } else if let abbreviation = model.boundaries?.constellation(of: object.equatorial) {
+                            Text(Constellation.name(abbreviation)).font(.system(size: 11)).foregroundColor(Color(white: 0.65))
+                        }
+                    }
+                    .lineLimit(1)
+                    Image(systemName: "chevron.up").font(.system(size: 11, weight: .bold)).foregroundColor(Color(white: 0.6))
+                } else {
+                    Image(systemName: "scope").font(.system(size: 13, weight: .semibold)).foregroundColor(Color(white: 0.7))
+                    Text("Point at a star").font(.system(size: 13)).foregroundColor(Color(white: 0.75))
+                }
+            }
+            .padding(.leading, 13).padding(.trailing, 15).frame(minHeight: 44).padding(.vertical, 4)
+            .background(Color(white: 0.11).opacity(0.9), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.1)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(object == nil)
+        .accessibilityLabel(object.map { "\($0.name). Show facts" } ?? "Point at a star")
+    }
+
+    /// The open card: header, facts, where it lives, and the buttons.
+    private func card(_ object: SkyObject) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                header(object)
+                Spacer(minLength: 0)
+                Button { setExpanded(false) } label: {
+                    Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold)).foregroundColor(Color(white: 0.7))
+                        .frame(width: 32, height: 32).background(Color.white.opacity(0.1), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show fewer facts")
+            }
+            if case .sun = object.kind {
+                Text("Never look at the Sun through a camera or binoculars.")
+                    .font(.system(size: 12, weight: .semibold)).foregroundColor(here)
+            }
+            details(object)
+        }
+        .padding(13)
+        .frame(maxWidth: 320)
+        .background(Color(white: 0.11).opacity(0.94), in: RoundedRectangle(cornerRadius: 24))
+        .contentShape(RoundedRectangle(cornerRadius: 24))
+        .gesture(DragGesture(minimumDistance: 12).onEnded { if $0.predictedEndTranslation.height > 60 { setExpanded(false) } })
+    }
+
+    private func setExpanded(_ expanded: Bool) {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) { isExpanded = expanded }
+    }
+
+    @ViewBuilder
+    private func details(_ object: SkyObject) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            let facts = facts(for: object)
+            if !facts.isEmpty {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], alignment: .leading, spacing: 8) {
+                    ForEach(facts) { fact in
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(fact.label).font(.system(size: 10)).foregroundColor(Color(white: 0.55)).lineLimit(1)
+                            Text(fact.value).font(.system(size: 14, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            if case .star(_, let host?) = object.kind {
+                Button(action: onFacts) {
+                    HStack(spacing: 8) {
+                        Circle().fill(PlanetComposition.gasRich.swiftUI(dark: true)).frame(width: 8, height: 8)
+                        Text(host.planetCount == 1 ? "1 known planet" : "\(host.planetCount) known planets").font(.system(size: 13, weight: .semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 12))
+                    }
+                    .padding(.horizontal, 12).frame(height: 40)
+                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+            ladder(object)
+            HStack(spacing: 10) {
+                Button(action: onFacts) {
+                    Text("Facts").font(.system(size: 14, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 38)
+                        .background(Color.white.opacity(0.12), in: Capsule())
+                }
+                Button(action: onOpenInAtlas) {
+                    Text("Open in Atlas").font(.system(size: 14, weight: .semibold)).foregroundColor(.black).frame(maxWidth: .infinity).frame(height: 38)
+                        .background(Color(red: 1, green: 0.69, blue: 0.36), in: Capsule())
+                }
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func header(_ object: SkyObject) -> some View {
         HStack(spacing: 10) {
             Circle().fill(color(object)).frame(width: 14, height: 14).shadow(color: color(object).opacity(0.8), radius: 6)
             VStack(alignment: .leading, spacing: 1) {
-                Text(object.name).font(.system(size: 22, weight: .bold))
+                Text(object.name).font(.system(size: 18, weight: .bold))
                 HStack(spacing: 4) {
                     if let designation = designation(object) {
                         Text(designation).foregroundColor(Color(white: 0.65))
