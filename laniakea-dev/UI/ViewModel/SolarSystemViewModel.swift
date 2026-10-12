@@ -4,16 +4,30 @@ import Foundation
 
 class SolarSystemViewModel: ObservableObject {
     @Published private(set) var planets: [Planet] = []
+    /// Pluto, Ceres, Eris, Haumea and Makemake; empty until loaded, and the planets show without them.
+    @Published private(set) var dwarfPlanets: [DwarfPlanet] = []
     @Published private(set) var errorMessage: String?
     @Published private(set) var isLoading = false
     @Published var selectedPlanet: Planet?
     private(set) var selectionDate = Date()
     let clock = SimulationClock()
+    let moons: MoonsViewModel
+
+    /// Planets and dwarf planets together, in order from the Sun.
+    var bodies: [Planet] {
+        (planets + dwarfPlanets.map(\.planet)).sorted { $0.orbit.semiMajorAxisAU < $1.orbit.semiMajorAxisAU }
+    }
+
+    func dwarf(_ planet: Planet) -> DwarfPlanet? { dwarfPlanets.first { $0.id == planet.id } }
 
     private let repo: PlanetRepo
+    private let bodiesRepo: SolarSystemBodiesRepo
 
-    init(repo: PlanetRepo) {
+    @MainActor
+    init(repo: PlanetRepo, bodiesRepo: SolarSystemBodiesRepo = CosmicCatalog.shared) {
         self.repo = repo
+        self.bodiesRepo = bodiesRepo
+        moons = MoonsViewModel(repo: bodiesRepo)
     }
 
     func select(_ planet: Planet) {
@@ -38,14 +52,17 @@ class SolarSystemViewModel: ObservableObject {
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription
                     ?? "Planet data couldn't be loaded from NASA JPL. Check your connection and try again."
+                return
             }
+            // After the planets, as Horizons takes one request at a time.
+            if dwarfPlanets.isEmpty, let dwarfs = try? await bodiesRepo.dwarfPlanets() { dwarfPlanets = dwarfs }
         }
     }
 
     func planets(matching query: String) -> [Planet] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return [] }
-        return planets.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+        return bodies.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
     }
 
     /// Distance from the Sun at the selection date, in au.

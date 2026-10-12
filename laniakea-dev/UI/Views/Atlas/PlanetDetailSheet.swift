@@ -5,6 +5,10 @@ struct PlanetDetailSheet: View {
     let distanceFromSunAU: Double?
     let distanceFromEarthAU: Double?
     let distanceDateLabel: String
+    /// Set for a dwarf planet: its designation, shape and where its values came from.
+    var dwarf: DwarfPlanet? = nil
+    /// Draws and lists its moons.
+    var moons: MoonsViewModel? = nil
 
     private static let kmPerAU = 149_597_870.7
 
@@ -16,6 +20,11 @@ struct PlanetDetailSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(planet.name)
                             .font(.system(size: 30, weight: .bold))
+                        if let dwarf {
+                            Text(["Dwarf planet", dwarf.designation].compactMap { $0 }.joined(separator: " · "))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.orange)
+                        }
                         Text(orbitSummary)
                             .font(.system(size: 16))
                             .foregroundColor(.secondary)
@@ -42,10 +51,18 @@ struct PlanetDetailSheet: View {
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                         if let radius = planet.meanRadiusKm {
-                            fact("Diameter", "\(Self.number(radius * 2)) km")
+                            fact("Diameter", "\(dwarf?.triaxialRadiiKm == nil ? "" : "≈ ")\(Self.number(radius * 2)) km")
+                        }
+                        if let axes = dwarf?.triaxialRadiiKm, Set(axes).count > 1 {
+                            fact("Shape", axes.map { Self.number($0 * 2) }.joined(separator: " × ") + " km")
                         }
                         if let mass = planet.massKg {
-                            fact("Mass", Self.scientific(mass, unit: "kg"))
+                            fact("Mass", (dwarf?.massIsEstimate == true ? "≈ " : "") + Self.scientific(mass, unit: "kg"))
+                        } else if dwarf != nil {
+                            fact("Mass", "Not measured")
+                        }
+                        if let albedo = dwarf?.geometricAlbedo {
+                            fact("Reflects", "\(Self.number(albedo * 100))% of sunlight")
                         }
                         if let gravity = planet.surfaceGravity {
                             fact(planet.temperatureIsAtOneBar ? "Gravity (cloud tops)" : "Surface gravity", "\(Self.number(gravity, digits: 1)) m/s²")
@@ -65,9 +82,27 @@ struct PlanetDetailSheet: View {
                         }
                     }
 
-                    Text("Source: NASA JPL Horizons")
+                    if let moons {
+                        MoonSystemSection(planet: planet, moons: moons)
+                    }
+
+                    if let notes = dwarf?.notes {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(notes, id: \.self) { Text($0) }
+                            if dwarf?.massIsEstimate == true {
+                                Text("Mass: the middle of the range Horizons gives.")
+                            }
+                            if dwarf?.planet.densityGramsPerCm3 != nil, planet.id != "999" {
+                                Text("Density and gravity: worked out from that size and mass.")
+                            }
+                        }
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
+                    } else {
+                        Text("Source: NASA JPL Horizons")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding(20)
             }
@@ -77,7 +112,13 @@ struct PlanetDetailSheet: View {
 
     /// NASA's photo, or if it can't load, the planet drawn to scale beside Earth.
     private var header: FactHeader? {
-        guard var photo = CelestialPhotos.solarSystem[planet.id] else { return nil }
+        guard var photo = CelestialPhotos.solarSystem[planet.id] else {
+            // Dwarf planets: drawn to scale beside our Moon, which is bigger than all of them.
+            return planet.meanRadiusKm.map { r in
+                .toScale([.init(name: planet.name, radius: r, look: .planet(planet.composition)),
+                          .init(name: "The Moon", radius: 1737.4, look: .planet(.rocky))])
+            }
+        }
         photo.fallback = planet.meanRadiusKm.map { r in
             .toScale([.init(name: planet.name, radius: r, look: .planet(planet.composition))]
                      + (planet.id == Planet.earthID ? [] : [.init(name: "Earth", radius: 6371, look: .planet(.rocky))]))

@@ -9,10 +9,13 @@ enum ObjectKind: String, CaseIterable, Hashable {
     // Stars: which set they belong to, then spectral class
     case withPlanets, nakedEye
     case hotStar, fStar, gStar, kStar, mStar, brownDwarf, whiteDwarf, unknownStar
+    // Black holes, and galaxies with a measured central one
+    case blackHole
     // Planets around other stars, by size
     case earthSize, superEarth, neptuneSize, jupiterSize, largerThanJupiter, unknownSize
     // Solar System
     case rocky, giant
+    case dwarfPlanet
 
     var label: String {
         switch self {
@@ -35,6 +38,7 @@ enum ObjectKind: String, CaseIterable, Hashable {
         case .brownDwarf: return "Brown dwarfs"
         case .whiteDwarf: return "White dwarfs"
         case .unknownStar: return "Type unknown"
+        case .blackHole: return "Black holes"
         case .earthSize: return "Earth-size"
         case .superEarth: return "Super-Earths"
         case .neptuneSize: return "Neptune-size"
@@ -43,6 +47,7 @@ enum ObjectKind: String, CaseIterable, Hashable {
         case .unknownSize: return "Size unknown"
         case .rocky: return "Rocky planets"
         case .giant: return "Giant planets"
+        case .dwarfPlanet: return "Dwarf planets"
         }
     }
 
@@ -170,23 +175,29 @@ enum FactSubject: Identifiable, Hashable {
     case laniakea
     case group(GalaxyGroup)
     case galaxy(Galaxy, groupName: String)
+    case localGroup
+    case localGroupGalaxy(LocalGroupGalaxy)
     case milkyWay
     case starSystem(StarSystem)
     case nakedEyeStar(NakedEyeStar)
     /// One of the 88 constellations, by IAU abbreviation.
     case constellation(String)
     case sun
+    case blackHole(BlackHole)
 
     var id: String {
         switch self {
         case .laniakea: return "laniakea"
         case .group(let g): return "group-\(g.id)"
         case .galaxy(let g, _): return "galaxy-\(g.id)"
+        case .localGroup: return "local-group"
+        case .localGroupGalaxy(let g): return "lg-\(g.id)"
         case .milkyWay: return "milky-way"
         case .starSystem(let s): return "star-\(s.id)"
         case .nakedEyeStar(let s): return "naked-\(s.id)"
         case .constellation(let abbreviation): return "constellation-\(abbreviation)"
         case .sun: return "sun"
+        case .blackHole(let b): return "black-hole-\(b.id)"
         }
     }
 
@@ -194,6 +205,7 @@ enum FactSubject: Identifiable, Hashable {
         switch place {
         case .laniakea: self = .laniakea
         case .group(let g): self = .group(g)
+        case .localGroup: self = .localGroup
         case .milkyWay: self = .milkyWay
         case .starSystem(let s): self = .starSystem(s)
         case .solarSystem: self = .sun

@@ -270,7 +270,7 @@ struct CosmicGraphView: View {
             let scale = g.tilts ? 1 : Double(recognizer.scale)
             recognizer.scale = 1
             var state = camera.state
-            let zoom = min(max(state.zoom * scale, 0.5), GraphCameraState.maxZoom)
+            let zoom = min(max(state.zoom * scale, scene.minZoom), GraphCameraState.maxZoom)
             let s = zoom / state.zoom
             // Moving the target toward the pivot by the zoom ratio keeps the pivot exactly where it
             // is on screen, perspective included (the camera's distance shrinks with the zoom).
@@ -359,7 +359,7 @@ struct CosmicGraphView: View {
         var order = scene.nodes.indices.filter { i in
             let n = scene.nodes[i]
             guard isVisible(i), screen.contains(points[i]) else { return false }
-            if n.isHere || i == selected || highlight.contains(i) { return true }
+            if n.isHere || n.isLandmark || i == selected || highlight.contains(i) { return true }
             return n.size >= detailThreshold && !n.name.hasPrefix("PGC ") && !n.name.hasPrefix("HR ")
         }
         order.sort { a, b in
@@ -461,7 +461,7 @@ struct CosmicGraphView: View {
         let unitsPerPoint = 1 / (baseScale(size) * rest.zoom)
         let length = Self.niceLength(unitsPerPoint * 90)
         let width = CGFloat(length / unitsPerPoint)
-        let ly = GraphBuilder.lightYearsText(parsecs: length * (scene.unit == .megaparsecs ? 1e6 : 1))
+        let ly = GraphBuilder.lightYearsText(parsecs: length * scene.unit.parsecs)
         return VStack(alignment: .leading, spacing: 4) {
             Rectangle().fill(Color.secondary).frame(width: width, height: 1)
                 .overlay(alignment: .leading) { Rectangle().fill(Color.secondary).frame(width: 1, height: 7) }

@@ -5,7 +5,7 @@ import Foundation
 @MainActor
 final class CosmosViewModel: ObservableObject {
     /// From the outside in; the last entry is on screen. Starts at home, the Solar System.
-    @Published private(set) var path: [AtlasPlace] = [.laniakea, .milkyWay, .solarSystem]
+    @Published private(set) var path: [AtlasPlace] = [.laniakea, .localGroup, .milkyWay, .solarSystem]
     @Published private(set) var scenes: [AtlasPlace: GraphScene] = [:]
     @Published private(set) var exoplanets: [StarSystem: [Exoplanet]] = [:]
     @Published private(set) var errors: [AtlasPlace: String] = [:]
@@ -40,6 +40,9 @@ final class CosmosViewModel: ObservableObject {
         filter.kinds = []
         if let index = path.firstIndex(of: place) {
             path = Array(path.prefix(through: index))
+        } else if place == .milkyWay {
+            // From elsewhere (the sky view), the Milky Way sits inside the Local Group.
+            path = [.laniakea, .localGroup, .milkyWay]
         } else {
             path.append(place)
         }
@@ -73,25 +76,45 @@ final class CosmosViewModel: ObservableObject {
                 switch place {
                 case .laniakea:
                     async let flowTask = try? repo.laniakeaFlow()
+                    // Tells which Cosmicflows-4 groups are in the Local Group; the map shows without it.
+                    async let localGroupTask = try? repo.localGroup()
                     let map = try await repo.laniakea()
                     // The flow is extra: the map shows without it if it can't be fetched.
-                    let flow = await flowTask
-                    setScene(await Task.detached { GraphBuilder.laniakea(map, flow: flow) }.value, for: place)
+                    let (flow, localGroup) = await (flowTask, localGroupTask)
+                    setScene(await Task.detached { GraphBuilder.laniakea(map, flow: flow, localGroup: localGroup) }.value, for: place)
+                case .localGroup:
+                    async let colorsTask = try? repo.galaxyColors()
+                    let localGroup = try await repo.localGroup()
+                    let colors = await colorsTask
+                    setScene(GraphBuilder.localGroup(localGroup, colors: colors), for: place)
                 case .group(let group):
+                    // Galaxy black holes are extra; the group still opens without them.
+                    async let holesTask = try? repo.supermassiveBlackHoles()
                     let galaxies = try await repo.galaxies(in: group)
-                    let spiral = try? await repo.galaxyColors().typical[.spiral]
-                    let milkyWay = spiral.map { GalaxyColor(bMinusV: $0, isMeasured: false, typeName: "spiral") }
-                    setScene(GraphBuilder.group(group, galaxies: galaxies, milkyWayColor: milkyWay), for: place)
+                    var scene = GraphBuilder.group(group, galaxies: galaxies)
+                    // The group shows right away; black-hole badges join when their query answers.
+                    setScene(scene, for: place)
+                    if let holes = await holesTask, !holes.isEmpty {
+                        GraphBuilder.markBlackHoles(holes, in: &scene)
+                        setScene(scene, for: place)
+                    }
                 case .milkyWay:
                     async let systemsTask = repo.starSystems()
                     async let sunTask = try? repo.sun().effectiveTemperatureK
                     // The naked-eye stars are extra; the map still opens without them.
                     async let nakedEyeTask = try? repo.nakedEyeStars()
+                    async let blackHolesTask = try? repo.milkyWayBlackHoles()
                     let (systems, sun, nakedEye) = try await (systemsTask, sunTask, nakedEyeTask)
                     sunTemperatureK = sun ?? sunTemperatureK
-                    setScene(await Task.detached {
+                    var scene = await Task.detached {
                         GraphBuilder.milkyWay(systems, nakedEye: nakedEye ?? [], sunTemperatureK: sun)
-                    }.value, for: place)
+                    }.value
+                    // The stars show right away; black holes join when their slower queries answer.
+                    setScene(scene, for: place)
+                    if let blackHoles = await blackHolesTask, !blackHoles.isEmpty {
+                        GraphBuilder.addBlackHoles(blackHoles, to: &scene)
+                        setScene(scene, for: place)
+                    }
                 case .starSystem(let system):
                     exoplanets[system] = try await repo.planets(of: system)
                 case .solarSystem:
@@ -104,6 +127,9 @@ final class CosmosViewModel: ObservableObject {
     }
 
     private func setScene(_ scene: GraphScene, for place: AtlasPlace) {
+        // A scene can grow after it first shows (black holes arriving), so per-node data starts over.
+        visibilityCache[place] = nil
+        nodeConstellations[place] = nil
         scenes[place] = scene
         locateConstellations(for: place)
     }

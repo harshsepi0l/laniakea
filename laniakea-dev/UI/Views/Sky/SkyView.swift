@@ -16,6 +16,7 @@ struct SkyView: View {
     @State private var optics: CameraOptics?
     @State private var selectedID: String?
     @State private var factSubject: FactSubject?
+    @State private var moonSheet: Moon?
     @State private var orientation = 1
     @State private var dragStart: CGSize?
     @State private var zoomStart: Double?
@@ -80,6 +81,7 @@ struct SkyView: View {
         }
         .onDisappear { model.stop() }
         .sheet(item: $factSubject) { FactSheetView(subject: $0) }
+        .sheet(item: $moonSheet) { MoonDetailSheet(moon: $0, primaryName: "Earth") }
     }
 
     // MARK: Geometry
@@ -177,6 +179,7 @@ struct SkyView: View {
         drawHorizon(in: &context, proj: proj)
 
         let dirs = cache.directions(for: model.objects, sky: sky)
+        let sunDirection = model.objects.firstIndex { $0.id == "sun" }.flatMap { $0 < dirs.count ? dirs[$0] : nil }
         var selectedSpot: (point: CGPoint, half: CGFloat)?
         var labels: [(String, CGPoint, CGFloat, Bool)] = []
         for (object, dir) in zip(model.objects, dirs) {
@@ -189,15 +192,22 @@ struct SkyView: View {
             case .star:
                 labels.append((object.name, p, dotRadius(object), isSelected))
             case .planet:
+                // Sized by brightness like the stars, a little larger so the fainter planets stay findable.
                 let color = object.composition.swiftUI(dark: true)
-                glow(&context, p, 14, color)
-                context.fill(Path(ellipseIn: CGRect(x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9)), with: .color(color))
-                labels.append((object.name, p, 5, isSelected))
+                let r = planetRadius(object)
+                glow(&context, p, r * 3, color)
+                context.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: .color(color))
+                labels.append((object.name, p, r + 0.5, isSelected))
             case .sun:
                 let color = StarColor.swiftUI(temperature: 5772, dark: true)
                 glow(&context, p, 40, color)
                 context.fill(Path(ellipseIn: CGRect(x: p.x - 10, y: p.y - 10, width: 20, height: 20)), with: .color(color))
                 labels.append(("Sun", p, 11, isSelected))
+            case .moon(let moon):
+                let r = drawMoon(in: &context, at: p, moon: moon, direction: dir, sunDirection: sunDirection, proj: proj)
+                labels.append(("Moon", p, r, isSelected))
+                if isSelected { selectedSpot = (p, r + 7) }
+                continue
             }
             if isSelected {
                 selectedSpot = (p, object.id == "sun" ? 20 : max(dotRadius(object) + 9, 14))
@@ -227,9 +237,49 @@ struct SkyView: View {
         }
     }
 
+    /// The Moon at its phase: the lit part faces the Sun, bounded by the limb on the Sun's side and
+    /// the terminator, a half-ellipse whose width follows the lit fraction k (it spans 1 − 2k of the
+    /// radius). Drawn at its true size when zoomed in enough, else at a size you can see.
+    /// Returns the radius drawn.
+    private func drawMoon(in context: inout GraphicsContext, at p: CGPoint, moon: MoonView, direction: SIMD3<Double>,
+                          sunDirection: SIMD3<Double>?, proj: SkyProjection) -> CGFloat {
+        let r = max(9, CGFloat(proj.focal * tan(moon.angularRadiusDeg * .pi / 180)))
+        glow(&context, p, r * 2.4, Color(white: 0.9))
+        let disc = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+        context.fill(disc, with: .color(Color(white: 0.55).opacity(0.22)))
+        context.stroke(disc, with: .color(.white.opacity(0.25)), lineWidth: 0.6)
+        // Which way the Sun lies across the screen from the Moon.
+        var angle = -Double.pi / 2
+        if let sun = sunDirection {
+            let toward = sun - simd_dot(sun, direction) * direction
+            let dx = simd_dot(toward, proj.right), dy = -simd_dot(toward, proj.up)
+            if abs(dx) + abs(dy) > 1e-9 { angle = atan2(dy, dx) }
+        }
+        let k = moon.illuminatedFraction, e = 1 - 2 * k, steps = 36
+        var lit = Path()
+        for j in 0...steps {
+            let t = -Double.pi / 2 + Double.pi * Double(j) / Double(steps)
+            let point = CGPoint(x: Double(r) * cos(t), y: Double(r) * sin(t))
+            if j == 0 { lit.move(to: point) } else { lit.addLine(to: point) }
+        }
+        for j in stride(from: steps, through: 0, by: -1) {
+            let t = -Double.pi / 2 + Double.pi * Double(j) / Double(steps)
+            lit.addLine(to: CGPoint(x: e * Double(r) * cos(t), y: Double(r) * sin(t)))
+        }
+        lit.closeSubpath()
+        lit = lit.applying(CGAffineTransform(rotationAngle: angle).concatenating(CGAffineTransform(translationX: p.x, y: p.y)))
+        context.fill(lit, with: .color(Color(white: 0.93)))
+        return r
+    }
+
     /// A star's dot radius: brighter stars draw bigger.
     private func dotRadius(_ object: SkyObject) -> CGFloat {
         CGFloat(min(max(3.4 - 0.5 * object.magnitude, 0.7), 5))
+    }
+
+    /// A planet's dot radius: the star scale one point larger, from 1.5 (Neptune) to 5.5 (Venus).
+    private func planetRadius(_ object: SkyObject) -> CGFloat {
+        CGFloat(min(max(4.4 - 0.5 * object.magnitude, 1.5), 5.5))
     }
 
     /// Four corner brackets around the pick, and a ring that grows and fades when it arrives.
@@ -423,7 +473,14 @@ struct SkyView: View {
         case .star(let star, let host): factSubject = host.map(FactSubject.starSystem) ?? .nakedEyeStar(star)
         case .sun: factSubject = .sun
         case .planet(let planet): onOpenPlanet(planet)
+        case .moon: if let moon = model.moonDetails { moonSheet = moon } else { openEarth() }
         }
+    }
+
+    /// The Moon lives with Earth in Atlas: Earth's card shows its moon.
+    private func openEarth() {
+        guard let earth = model.planets.first(where: { $0.id == Planet.earthID }) else { onOpenInAtlas(.solarSystem, nil); return }
+        onOpenPlanet(earth)
     }
 
     private func openInAtlas() {
@@ -433,6 +490,7 @@ struct SkyView: View {
             onOpenInAtlas(.milkyWay, host.map { "star-\($0.id)" } ?? (star.distanceParsecs != nil ? "naked-\(star.id)" : nil))
         case .sun: onOpenInAtlas(.solarSystem, nil)
         case .planet(let planet): onOpenPlanet(planet)
+        case .moon: openEarth()
         }
     }
 }

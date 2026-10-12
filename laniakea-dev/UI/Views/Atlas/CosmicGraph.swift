@@ -1,10 +1,12 @@
 import Foundation
 import simd
 
-/// A place in Atlas, from the outside in: Laniakea, then a galaxy group or the Milky Way, then a star system.
+/// A place in Atlas, from the outside in: Laniakea, then a galaxy group or the Local Group, then the
+/// Milky Way, then a star system.
 enum AtlasPlace: Hashable {
     case laniakea
     case group(GalaxyGroup)
+    case localGroup
     case milkyWay
     case starSystem(StarSystem)
     case solarSystem
@@ -13,6 +15,7 @@ enum AtlasPlace: Hashable {
         switch self {
         case .laniakea: return "Laniakea"
         case .group(let group): return group.name
+        case .localGroup: return "Local Group"
         case .milkyWay: return "Milky Way"
         case .starSystem(let system): return system.name
         case .solarSystem: return "Solar System"
@@ -28,7 +31,7 @@ struct GraphNode: Identifiable {
     let position: SIMD2<Double>
     /// 0…1, sets the dot size.
     let size: Double
-    let subtitle: String
+    var subtitle: String
     /// Where tapping "Open" goes, if this node has an inside view.
     let opens: AtlasPlace?
     var isHere = false
@@ -48,6 +51,12 @@ struct GraphNode: Identifiable {
     var velocity: SIMD3<Double>?
     /// Drawn as a black hole (a black disc with white swirls) rather than a glowing dot.
     var isBlackHole = false
+    /// Carries a small black-hole badge beside its dot: a galaxy with a measured central black hole.
+    var hasBlackHole = false
+    /// Other names search finds it by, besides `name`.
+    var searchTerms: [String] = []
+    /// Named at any zoom, like where you are (the Galactic Centre on the star map).
+    var isLandmark = false
 
     /// Where it is `years` from now (straight-line motion).
     func position(atYears years: Double) -> SIMD3<Double> {
@@ -57,7 +66,7 @@ struct GraphNode: Identifiable {
 
 /// Everything a graph view draws for one place.
 struct GraphScene {
-    let nodes: [GraphNode]
+    var nodes: [GraphNode]
     /// Pairs of node indices, Obsidian-style links.
     let links: [(Int, Int)]
     /// Unit of `position`, for the scale bar.
@@ -92,6 +101,9 @@ struct GraphScene {
     /// How fast the shaded region grows with the expansion of space, per year, about the origin
     /// (the Milky Way); 0 for none.
     var regionExpansionPerYear: Double = 0
+    /// How far out a pinch may zoom; below 0.5 where something worth finding lies far beyond the
+    /// first view (the Galactic Centre, 8 kpc from the Sun, on the star map).
+    var minZoom: Double = 0.5
 
     /// A place's simulation: what it runs, how far it stays accurate, and its speeds.
     struct Motion {
@@ -115,10 +127,23 @@ struct GraphScene {
     }
 
     enum Unit {
-        case megaparsecs, parsecs
+        case megaparsecs, kiloparsecs, parsecs
 
-        var lightYears: Double { self == .megaparsecs ? 3.2616e6 : 3.2616 }
-        var symbol: String { self == .megaparsecs ? "Mpc" : "pc" }
+        var parsecs: Double {
+            switch self {
+            case .megaparsecs: return 1e6
+            case .kiloparsecs: return 1e3
+            case .parsecs: return 1
+            }
+        }
+        var lightYears: Double { parsecs * 3.2616 }
+        var symbol: String {
+            switch self {
+            case .megaparsecs: return "Mpc"
+            case .kiloparsecs: return "kpc"
+            case .parsecs: return "pc"
+            }
+        }
     }
 
     /// Indices of the nodes linked to `index`.
@@ -148,9 +173,17 @@ final class AdjacencyCache {
 
 enum GraphBuilder {
     /// Groups in Laniakea, seen from above the supergalactic plane, with the Milky Way at the centre.
-    static func laniakea(_ map: LaniakeaMap, flow: LaniakeaFlow? = nil) -> GraphScene {
-        let largest = Double(map.groups.map(\.galaxyCount).max() ?? 1)
-        var nodes = map.groups.map { g in
+    /// Cosmicflows-4's pieces of the Local Group (Andromeda's group, the Milky Way's, the Magellanic
+    /// Clouds and lone dwarfs) are folded into one Local Group node where we are.
+    static func laniakea(_ map: LaniakeaMap, flow: LaniakeaFlow? = nil, localGroup: LocalGroup? = nil) -> GraphScene {
+        let groups = map.groups.filter { g in
+            if let localGroup { return !localGroup.includes(g) }
+            // Without the Local Volume Database, fold the two halves Cosmicflows-4 names, and anything
+            // within the Milky Way's halo (about 300 kpc).
+            return g.id != GalaxyGroup.andromedaGroupID && g.id != GalaxyGroup.milkyWayGroupID && g.distanceMpc > 0.3
+        }
+        let largest = Double(groups.map(\.galaxyCount).max() ?? 1)
+        var nodes = groups.map { g in
             GraphNode(
                 id: "group-\(g.id)", name: g.name, position: SIMD2(g.position.x, g.position.y),
                 size: log(Double(g.galaxyCount) + 1) / log(largest + 1),
@@ -163,11 +196,12 @@ enum GraphBuilder {
             )
         }
         nodes.append(GraphNode(
-            id: "milky-way", name: "Milky Way", position: .zero, size: 0.35,
-            subtitle: "Our galaxy · You are here", opens: .milkyWay, isHere: true, facts: .milkyWay,
+            id: "local-group", name: "Local Group", position: .zero, size: 0.35,
+            subtitle: localGroup.map { "\($0.members.count) galaxies · You are here" } ?? "Our galaxy's group · You are here",
+            opens: .localGroup, isHere: true, kinds: [.group], facts: .localGroup,
             temperatureK: colorTemperature(map.milkyWayColor)
         ))
-        var points = map.groups.map(\.position)
+        var points = groups.map(\.position)
         points.append(.zero)
         // Frame Laniakea itself; the Milky Way sits near its edge, not its middle.
         let xs = map.outlineCells.map(\.x), ys = map.outlineCells.map(\.y)
@@ -177,7 +211,7 @@ enum GraphBuilder {
             nodes: nodes, links: nearestNeighbors(points, k: 2, within: 12), unit: .megaparsecs,
             region: (map.outlineCells, map.cellSizeMpc), regionOutline: outline(cells: map.outlineCells, size: map.cellSizeMpc),
             fitRadius: fit, fitCenter: centre,
-            caption: "\(map.groups.filter { !$0.isOnBoundary }.count.formatted()) galaxy groups inside, faint ones on the edge. "
+            caption: "\((groups.filter { !$0.isOnBoundary }.count + 1).formatted()) galaxy groups inside, faint ones on the edge. "
                 + (flow == nil ? "Shading is Laniakea; empty parts haven't had galaxy distances measured, mostly behind the Milky Way's disc."
                    : "White lines show how matter flows and soft points mark the cosmic web (Cosmicflows-4), even where no galaxy has been measured. Flat, they're the slice through the supergalactic plane.")
         )
@@ -226,7 +260,7 @@ enum GraphBuilder {
 
     /// A group's galaxies around its brightest member. Nearby groups use each galaxy's own distance;
     /// farther out the distances are too uncertain, so galaxies are shown where they sit on the sky.
-    static func group(_ group: GalaxyGroup, galaxies: [Galaxy], milkyWayColor: GalaxyColor? = nil) -> GraphScene {
+    static func group(_ group: GalaxyGroup, galaxies: [Galaxy]) -> GraphScene {
         let centre = group.position
         let axis = simd_normalize(centre)
         // Two directions across the line of sight for the sky-plane layout: toward increasing
@@ -235,7 +269,7 @@ enum GraphBuilder {
         let up = simd_cross(axis, across)
         let useDistances = group.distanceMpc < 5
 
-        var nodes = galaxies.map { g -> GraphNode in
+        let nodes = galaxies.map { g -> GraphNode in
             let position: SIMD2<Double>
             if useDistances {
                 let offset = g.position - centre
@@ -257,27 +291,15 @@ enum GraphBuilder {
             )
         }
         let hub = galaxies.firstIndex { $0.id == group.id }
-        var links = hub.map { h in nodes.indices.filter { $0 != h }.map { (h, $0) } } ?? []
-        // Cosmicflows-4 has no entry for our own galaxy, so add it to the group it belongs to: the
-        // Local Group, led by Andromeda (PGC 2557).
-        if group.id == GalaxyGroup.localGroupID {
-            let here = -centre
-            nodes.append(GraphNode(
-                id: "milky-way", name: "Milky Way", position: SIMD2(here.x, here.y), size: 0.8,
-                subtitle: "Our galaxy · You are here", opens: .milkyWay, isHere: true, facts: .milkyWay,
-                temperatureK: colorTemperature(milkyWayColor), depth: here.z
-            ))
-            if let hub { links.append((hub, nodes.count - 1)) }
-        }
+        let links = hub.map { h in nodes.indices.filter { $0 != h }.map { (h, $0) } } ?? []
         // Fit most of the group; a few outlying members would otherwise shrink the rest to a dot.
         let spread = nodes.map { simd_length($0.position) }.sorted()
-        // ...but always keep the brightest galaxy and, in the Local Group, the Milky Way in view.
-        let anchors = nodes.filter { $0.isHere || $0.id == "galaxy-\(group.id)" }.map { simd_length($0.position) }
+        // ...but always keep the brightest galaxy in view.
+        let anchors = nodes.filter { $0.id == "galaxy-\(group.id)" }.map { simd_length($0.position) }
         let fit = max(spread.isEmpty ? 1 : spread[Int(Double(spread.count - 1) * 0.85)], anchors.max() ?? 0, 0.2) * 1.2
         return GraphScene(
             nodes: nodes, links: links, unit: .megaparsecs, region: nil, fitRadius: fit,
-            caption: (useDistances ? "Positions from each galaxy's distance" : "Positions on the sky; distances within the group are too uncertain to show depth")
-                + (group.id == GalaxyGroup.localGroupID ? ". With the Milky Way, added here, they make up the Local Group." : "")
+            caption: useDistances ? "Positions from each galaxy's distance" : "Positions on the sky; distances within the group are too uncertain to show depth"
         )
     }
 

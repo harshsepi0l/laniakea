@@ -54,6 +54,8 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
     private var regionQuad: RegionQuadData?
 
     private struct Key: Equatable {
+        /// So objects added after a map first shows (black holes) get drawn.
+        let nodeCount: Int
         let visible: [Bool]?
         let selected: Int?
         let dark: Bool
@@ -120,7 +122,7 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
             }
         }
         clockChanged()
-        let newKey = Key(visible: content.visible, selected: content.selected, dark: content.dark,
+        let newKey = Key(nodeCount: content.scene.nodes.count, visible: content.visible, selected: content.selected, dark: content.dark,
                          hasRegionImage: content.regionImage != nil)
         guard newKey != key, let device else { return }
         key = newKey
@@ -263,6 +265,11 @@ final class GraphRenderer: NSObject, MTKViewDelegate {
                     rings.append(SpriteData(color: palette.here, position: p, velocity: v, size: max(size, 0.5), shape: 2, extra: 22, width: 1.6))
                 }
                 continue
+            }
+            if n.hasBlackHole {
+                // A small black hole beside the dot (offset in the shader), so the galaxy keeps its own.
+                accents.append(SpriteData(color: SIMD4(1, 1, 1, selected != nil && !highlight.contains(i) ? 0.35 : 1),
+                                          position: p, velocity: v, size: 0.2, shape: 4, extra: 6.5, width: max(size, 0.01)))
             }
             if isAccent || n.size > 0.55 {
                 glows.append(SpriteData(color: color.withAlpha(isAccent ? 0.45 : (dark ? 0.24 : 0.14)), position: p, velocity: v, size: size, shape: 1, extra: 3.4))

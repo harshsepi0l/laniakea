@@ -34,11 +34,17 @@ final class FactSheetViewModel: ObservableObject {
             case .group(let g):
                 data.groupDetails = try await repo.details(of: g)
             case .galaxy(let g, _):
+                async let hole = try? repo.supermassiveBlackHoles()[g.id]
                 data.galaxyDetails = try await repo.details(of: g)
+                data.blackHole = await hole
+            case .localGroup, .localGroupGalaxy:
+                data.localGroup = try await repo.localGroup()
             case .milkyWay:
                 async let systems = repo.starSystems()
                 async let sun = repo.sun()
                 async let colors = repo.galaxyColors()
+                async let centre = try? repo.milkyWayBlackHoles().first { $0.setting == .galacticCentre }
+                data.blackHole = await centre
                 data.systems = try await systems
                 data.sun = try? await sun
                 data.galaxyColors = try? await colors
@@ -48,7 +54,7 @@ final class FactSheetViewModel: ObservableObject {
                 data.brightStar = await bright
             case .sun:
                 data.sun = try await repo.sun()
-            case .nakedEyeStar:
+            case .nakedEyeStar, .blackHole:
                 break
             case .constellation(let abbreviation):
                 async let starsTask = repo.nakedEyeStars()

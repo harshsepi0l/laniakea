@@ -9,3 +9,6 @@ Secrets.swift
 site/
 .venv/
 __pycache__/
+
+# Agent worktrees
+.claude/worktrees/

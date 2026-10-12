@@ -8,11 +8,12 @@ import simd
 /// |---|---|
 /// | Laniakea's boundary | Cosmicflows basins of attraction (Dupuy & Courtois 2023) |
 /// | Galaxy groups and galaxies | Cosmicflows-4 (Tully et al. 2023) via VizieR |
+/// | The Local Group | Local Volume Database (Pace 2025); types from McConnachie (2012) via VizieR |
 /// | Names, Hubble types | SIMBAD |
 /// | Galaxy colors | RC3 (de Vaucouleurs et al. 1991) via VizieR |
-/// | Stars with planets, and their planets | NASA Exoplanet Archive |
+/// | Stars with planets, and their planets | NASA Exoplanet Archive; Gaia DR3 and SIMBAD parallaxes where it has no distance |
 /// | Solar System planets | JPL Horizons |
-/// | Naked-eye stars | Yale Bright Star Catalogue, Hipparcos, JSDC and PASTEL via VizieR; IAU star names |
+/// | Naked-eye stars | Yale Bright Star Catalogue, Hipparcos, JSDC, PASTEL and GCVS (novae) via VizieR; IAU star names |
 /// | Constellation boundaries | IAU boundaries (Roman 1987) from CDS |
 final class CosmicCatalog: CosmicRepo, PlanetRepo {
     static let shared = CosmicCatalog()
@@ -21,7 +22,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     private let boundary = LaniakeaBoundarySource()
     private let flowSource = CosmicFlowSource()
 
-    private static let catalogAge: TimeInterval = 180 * 86400
+    static let catalogAge: TimeInterval = 180 * 86400
     private static let exoplanetAge: TimeInterval = 7 * 86400
 
     // MARK: Solar System
@@ -43,7 +44,9 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     }
 
     func laniakea() async throws -> LaniakeaMap {
-        try await cached(DiskCache<LaniakeaMap>(name: "laniakea-map-v7"), maxAge: Self.catalogAge) {
+        // Names and types come from SIMBAD, which can be slow; the map shows without them.
+        var complete = true
+        return try await cached(DiskCache<LaniakeaMap>(name: "laniakea-map-v8"), maxAge: Self.catalogAge, isComplete: { complete }) {
             async let gridTask = self.boundary.loadGrid()
             async let colorsTask = self.galaxyColors()
             async let rowsTask = TAPClient.vizier.query("""
@@ -57,7 +60,15 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                 AVG(COS(RADIANS(SGB))*SIN(RADIANS(SGL))) AS uy, AVG(SIN(RADIANS(SGB))) AS uz \
                 FROM "J/ApJ/944/94/table2" GROUP BY "1PGC"
                 """)
-            let (grid, rows, directionRows, colors) = try await (gridTask, rowsTask, directionsTask, colorsTask)
+            // A few galaxies' group (1PGC) has no row in the group table, among them the Magellanic
+            // Clouds; each such set becomes a group of its own at its members' mean distance modulus.
+            async let orphansTask = TAPClient.vizier.query("""
+                SELECT t."1PGC", COUNT(*) AS n, AVG(t.DM) AS dm FROM "J/ApJ/944/94/table2" AS t \
+                WHERE t."1PGC" NOT IN (SELECT g."1PGC" FROM "J/ApJ/944/94/groups" AS g) GROUP BY t."1PGC"
+                """)
+            let (grid, groupRows, directionRows, colors) = try await (gridTask, rowsTask, directionsTask, colorsTask)
+            let orphans = (try? await orphansTask) ?? []
+            let rows = groupRows + orphans.map { ["1PGC": $0["1PGC"] ?? "", "Ngal": $0["n"] ?? "", "DMzp": $0["dm"] ?? ""] }
             var directions: [Int: SIMD3<Double>] = [:]
             for row in directionRows {
                 guard let id = row.int("1PGC"), let x = row.double("ux"), let y = row.double("uy"), let z = row.double("uz"),
@@ -82,18 +93,22 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                                  velocity: row.double("Vh") ?? 0, edge: !isInside)
             }
 
-            async let clusterNamesTask = self.namedClusters(for: inside.map { ($0.id, $0.position, $0.velocity, $0.count) })
-            async let galaxyNamesTask = self.galaxyNames(pgc: inside.map(\.id))
+            async let clusterNamesTask = try? self.namedClusters(for: inside.map { ($0.id, $0.position, $0.velocity, $0.count) })
+            async let galaxyNamesTask = try? self.galaxyNames(pgc: inside.map(\.id))
             // So a group's dot matches its brightest galaxy's color inside the group view.
-            async let leaderTypesTask = self.morphologies(pgc: inside.map(\.id))
-            let (clusterNames, galaxyNames, leaderTypes) = try await (clusterNamesTask, galaxyNamesTask, leaderTypesTask)
+            async let leaderTypesTask = try? self.morphologies(pgc: inside.map(\.id))
+            let (clusterNamesResult, galaxyNamesResult, leaderTypesResult) = await (clusterNamesTask, galaxyNamesTask, leaderTypesTask)
+            if clusterNamesResult == nil || galaxyNamesResult == nil || leaderTypesResult == nil { complete = false }
+            let clusterNames = clusterNamesResult ?? [:], galaxyNames = galaxyNamesResult ?? [:], leaderTypes = leaderTypesResult ?? [:]
 
             let groups = inside.map { c -> GalaxyGroup in
                 let galaxy = galaxyNames[c.id] ?? "PGC \(c.id)"
                 let named = clusterNames[c.id]
-                // Cosmicflows-4's entry here is only Andromeda's half of the Local Group; the Milky
-                // Way's half isn't listed. So it's named for Andromeda, not the whole Local Group.
-                let name = c.id == GalaxyGroup.localGroupID ? "Andromeda group" : named?.name ?? (c.count > 1 ? "\(galaxy) group" : galaxy)
+                // Cosmicflows-4 splits the Local Group into Andromeda's group and the Milky Way's
+                // (whose leader has no name in SIMBAD). The map folds both into the Local Group.
+                let name = c.id == GalaxyGroup.andromedaGroupID ? "Andromeda group"
+                    : c.id == GalaxyGroup.milkyWayGroupID ? "Milky Way group"
+                    : named?.name ?? (c.count > 1 ? "\(galaxy) group" : galaxy)
                 return GalaxyGroup(id: c.id, name: name, galaxyCount: c.count, distanceMpc: c.distance,
                                    position: c.position, isOnBoundary: c.edge, isCluster: named?.isCluster ?? false,
                                    color: colors.color(pgc: c.id, morphology: leaderTypes[c.id]),
@@ -135,12 +150,13 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     }
 
     func details(of group: GalaxyGroup) async throws -> GroupDetails {
-        try await cached(DiskCache<GroupDetails>(name: "cf4-group-details-v3-\(group.id)"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<GroupDetails>(name: "cf4-group-details-v4-\(group.id)"), maxAge: Self.catalogAge) {
             let rows = try await TAPClient.vizier.query("""
                 SELECT e_DMzp, fV3k, Vh, Vpec, o_DMcal, o_DMsnIa, o_DMfp, o_DMtf, o_DMsbfo, o_DMsbfi, DMsnII \
                 FROM "J/ApJ/944/94/groups" WHERE "1PGC" = \(group.id)
                 """)
-            guard let row = rows.first else { throw CatalogError.unreadable("This group's Cosmicflows-4 entry") }
+            // Groups without a row of their own are described from their galaxies.
+            guard let row = rows.first else { return try await self.memberDetails(of: group) }
             // The catalog counts galaxies per method, except for type II supernovae.
             var methods: [GroupDetails.MethodCount] = []
             let counted: [(DistanceMethod, Int?)] = [
@@ -194,29 +210,112 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     // MARK: Exoplanets
 
     func starSystems() async throws -> [StarSystem] {
-        try await cached(DiskCache<[StarSystem]>(name: "exoplanet-hosts-v4"), maxAge: Self.exoplanetAge) {
+        var complete = true
+        return try await cached(DiskCache<[StarSystem]>(name: "exoplanet-hosts-v5"), maxAge: Self.exoplanetAge, isComplete: { complete }) {
             // One row per star. sy_pnum counts planets around every star in a multiple system (55 Cnc B
             // would show 7), so count each star's own planets instead.
             let rows = try await TAPClient.exoplanetArchive.query("""
                 select hostname, avg(ra) as ra, avg(dec) as dec, max(sy_dist) as sy_dist, count(*) as planets, \
                 max(st_spectype) as st_spectype, max(st_teff) as st_teff, max(hd_name) as hd_name, \
-                avg(sy_pmra) as pmra, avg(sy_pmdec) as pmdec, avg(st_radv) as rv from pscomppars where sy_dist is not null group by hostname
+                max(sy_plx) as sy_plx, max(sy_plxerr1) as sy_plxerr, max(gaia_dr3_id) as gaia_dr3_id, \
+                avg(sy_pmra) as pmra, avg(sy_pmdec) as pmdec, avg(st_radv) as rv from pscomppars group by hostname
                 """)
+            // A host's planets still count without the archive's distance, if a parallax places it.
+            let (fallback, answered) = await Self.fallbackDistances(rows.filter { $0.double("sy_dist") == nil })
+            if !answered { complete = false }
             return try Self.nonEmpty("Stars with planets", rows.compactMap { row in
                 guard let name = row["hostname"], !name.isEmpty,
-                      let ra = row.double("ra"), let dec = row.double("dec"), let d = row.double("sy_dist")
+                      let ra = row.double("ra"), let dec = row.double("dec"), let d = row.double("sy_dist") ?? fallback[name]
                 else { return nil }
                 let g = SkyCoordinates.galactic(raDeg: ra, decDeg: dec)
                 return StarSystem(
                     id: name, name: name, distanceParsecs: d, planetCount: row.int("planets") ?? 1,
                     spectralType: row["st_spectype"].flatMap { $0.isEmpty ? nil : $0 },
                     temperatureK: row.double("st_teff"),
-                    hd: row["hd_name"].flatMap { Int($0.replacingOccurrences(of: "HD", with: "").trimmingCharacters(in: .whitespaces)) },
+                    hd: Self.hdNumber(row["hd_name"]),
                     position: SkyCoordinates.cartesian(longitudeDeg: g.l, latitudeDeg: g.b, distance: d),
                     pmRAMasPerYear: row.double("pmra"), pmDecMasPerYear: row.double("pmdec"), radialVelocityKmS: row.double("rv")
                 )
             })
         }
+    }
+
+    /// The HD number that links a host to the naked-eye stars. Hosts in multiple systems are named
+    /// like "HD 59686 A"; the Bright Star Catalogue's entry is the bright primary, so a B or C
+    /// companion keeps no link (it would otherwise borrow the primary's brightness).
+    private static func hdNumber(_ name: String?) -> Int? {
+        guard let name, let match = name.wholeMatch(of: #/HD\s*(\d+)\s*([A-Za-z]?)/#) else { return nil }
+        let component = match.output.2.uppercased()
+        return component.isEmpty || component == "A" ? Int(match.output.1) : nil
+    }
+
+    /// Distances in parsecs for hosts the archive gives none, from a parallax measured to better than
+    /// 20% (inverting a parallax is only reliable that far; Bailer-Jones 2015, PASP 127, 994), tried in
+    /// turn: the archive's own parallax, Gaia DR3 for the archive's Gaia source, then SIMBAD by name,
+    /// where a star in a double takes the pair's parallax (Luhman 16 A is listed under Luhman 16).
+    /// Hosts in globular clusters or found by microlensing have no parallax and stay out. A source
+    /// that doesn't answer is skipped rather than failing the whole list.
+    private static func fallbackDistances(_ rows: [TAPClient.Row]) async -> (distances: [String: Double], answered: Bool) {
+        var answered = true
+        func parsecs(_ plx: Double?, _ error: Double?) -> Double? {
+            guard let plx, let error, plx > 0, error > 0, error < 0.2 * plx else { return nil }
+            return 1000 / plx
+        }
+        var distances: [String: Double] = [:]
+        for row in rows {
+            if let name = row["hostname"], let d = parsecs(row.double("sy_plx"), row.double("sy_plxerr")) { distances[name] = d }
+        }
+
+        var hostsByGaia: [String: String] = [:]
+        for row in rows {
+            guard let name = row["hostname"], distances[name] == nil,
+                  let source = row["gaia_dr3_id"]?.split(separator: " ").last, source.allSatisfy(\.isNumber)
+            else { continue }
+            hostsByGaia[String(source)] = name
+        }
+        if !hostsByGaia.isEmpty {
+            let gaiaRows = try? await TAPClient.vizier.query("""
+                SELECT Source, Plx, e_Plx FROM "I/355/gaiadr3" WHERE Source IN (\(hostsByGaia.keys.joined(separator: ",")))
+                """, timeout: 20)
+            if gaiaRows == nil { answered = false }
+            let gaia = gaiaRows ?? []
+            for row in gaia {
+                if let source = row["Source"], let name = hostsByGaia[source], let d = parsecs(row.double("Plx"), row.double("e_Plx")) {
+                    distances[name] = d
+                }
+            }
+        }
+
+        // SIMBAD spells names its own way ("NAME Luhman 16A", "CD-35  2722B"), so ask for a few
+        // spellings and match the answers back ignoring spaces and case.
+        func key(_ id: String) -> String {
+            (id.hasPrefix("NAME ") ? String(id.dropFirst(5)) : id).filter { !$0.isWhitespace }.lowercased()
+        }
+        var hostsByKey: [String: String] = [:]
+        var spellings: [String] = []
+        for row in rows {
+            guard let name = row["hostname"], distances[name] == nil else { continue }
+            hostsByKey[key(name)] = name
+            let joined = name.replacing(#/\s+([A-Z])$/#) { $0.output.1 }
+            for spelling in Set([name, joined]) { spellings += [spelling, "NAME " + spelling] }
+        }
+        guard !spellings.isEmpty else { return (distances, answered) }
+        let ids = spellings.map { "'\($0.replacingOccurrences(of: "'", with: "''"))'" }.joined(separator: ",")
+        let simbadRows = try? await TAPClient.simbad.query("""
+            SELECT i.id, b.plx_value, b.plx_err, p.plx_value AS system_plx, p.plx_err AS system_plx_err \
+            FROM ident AS i JOIN basic AS b ON b.oid = i.oidref LEFT JOIN h_link AS h ON h.child = b.oid \
+            LEFT JOIN basic AS p ON p.oid = h.parent AND p.otype = '**' WHERE i.id IN (\(ids))
+            """, timeout: 20)
+        if simbadRows == nil { answered = false }
+        let simbad = simbadRows ?? []
+        for row in simbad {
+            guard let id = row["id"], let name = hostsByKey[key(id)], distances[name] == nil,
+                  let d = parsecs(row.double("plx_value"), row.double("plx_err"))
+                    ?? parsecs(row.double("system_plx"), row.double("system_plx_err"))
+            else { continue }
+            distances[name] = d
+        }
+        return (distances, answered)
     }
 
     func planets(of system: StarSystem) async throws -> [Exoplanet] {
@@ -246,7 +345,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
 
     func details(of system: StarSystem) async throws -> StarDetails {
         let key = system.id.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? String($0) : "-" }.joined()
-        return try await cached(DiskCache<StarDetails>(name: "star-details-\(key)"), maxAge: Self.exoplanetAge) {
+        return try await cached(DiskCache<StarDetails>(name: "star-details-v2-\(key)"), maxAge: Self.exoplanetAge) {
             let host = system.id.replacingOccurrences(of: "'", with: "''")
             let rows = try await TAPClient.exoplanetArchive.query("""
                 select st_spectype, st_teff, st_rad, st_mass, st_age, st_met, st_lum, sy_vmag, sy_snum \
@@ -265,14 +364,18 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     // MARK: Naked-eye stars
 
     func nakedEyeStars() async throws -> [NakedEyeStar] {
-        try await cached(DiskCache<[NakedEyeStar]>(name: "naked-eye-stars-v3"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<[NakedEyeStar]>(name: "naked-eye-stars-v4"), maxAge: Self.catalogAge) {
             // The Bright Star Catalogue's own parallaxes are old, so join the Hipparcos new reduction
-            // through the HD numbers in the original Hipparcos catalog.
+            // through the HD numbers in the original Hipparcos catalog (see `HipparcosIndex` for the
+            // doubles that join misses).
             async let starsTask = TAPClient.vizier.query("""
-                SELECT b.HR, b.Name, b.HD, b.RAJ2000, b.DEJ2000, b.Vmag, b."B-V", b.SpType, h2.Plx, h2.e_Plx, \
-                h2.pmRA, h2.pmDE, b.pmRA AS bpmRA, b.pmDE AS bpmDE, b.RadVel \
+                SELECT b.HR, b.Name, b.HD, b.RAJ2000, b.DEJ2000, b.Vmag, b."B-V", b.SpType, h2.HIP, h2.RArad, h2.DErad, \
+                h2.Plx, h2.e_Plx, h2.pmRA, h2.pmDE, b.pmRA AS bpmRA, b.pmDE AS bpmDE, b.RadVel \
                 FROM "V/50/catalog" AS b LEFT JOIN "I/239/hip_main" AS h ON h.HD = b.HD \
                 LEFT JOIN "I/311/hip2" AS h2 ON h2.HIP = h.HIP WHERE b.Vmag <= 6
+                """)
+            async let hipparcosTask = TAPClient.vizier.query("""
+                SELECT HIP, RArad, DErad, Plx, e_Plx, pmRA, pmDE FROM "I/311/hip2" WHERE Hpmag <= 7
                 """)
             async let diametersTask = TAPClient.vizier.query("""
                 SELECT RAJ2000, DEJ2000, LDD FROM "II/346/jsdc_v2" WHERE Vmag <= 6.5 AND LDD > 0
@@ -280,8 +383,15 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
             async let temperaturesTask = TAPClient.vizier.query("""
                 SELECT ID, RAdeg, DEdeg, Teff FROM "B/pastel/pastel" WHERE Vmag <= 6.5 AND Teff IS NOT NULL
                 """)
+            // Novae in the General Catalogue of Variable Stars (Samus et al. 2017): types N, NA, NB, NC
+            // and NR (recurrent). NL, "nova-like", are steady and aren't included.
+            async let novaeTask = TAPClient.vizier.query("""
+                SELECT RAJ2000, DEJ2000, Min1 FROM "B/gcvs/gcvs_cat" WHERE VarType LIKE 'N%' AND VarType NOT LIKE 'NL%'
+                """)
             async let namesTask = try? Self.iauStarNames()
-            let (rows, diameterRows, temperatureRows, names) = try await (starsTask, diametersTask, temperaturesTask, namesTask)
+            let (rows, hipparcosRows, diameterRows, temperatureRows, novaRows, names) = try await (
+                starsTask, hipparcosTask, diametersTask, temperaturesTask, novaeTask, namesTask
+            )
 
             // Both catalogs name stars their own way, so they're matched to the Bright Star Catalogue by position.
             let diameters = PositionIndex(diameterRows.compactMap { row in
@@ -289,24 +399,39 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                 return (ra, dec, ldd)
             })
             let temperatures = PositionIndex(medianTemperatures(temperatureRows))
+            // The Bright Star Catalogue lists a nova at its outburst peak (T CrB at 2.0, its 1946
+            // eruption); most of the time it is far fainter (T CrB ≈ 10), so it isn't a naked-eye star.
+            let novae = PositionIndex(novaRows.compactMap { row in
+                guard let ra = row.double("RAJ2000"), let dec = row.double("DEJ2000") else { return nil }
+                return (ra, dec, row.double("Min1") ?? .infinity)
+            })
+            let hipparcos = HipparcosIndex(hipparcosRows)
 
-            var seen = Set<Int>()
-            let stars = rows.compactMap { row -> NakedEyeStar? in
-                guard let hr = row.int("HR"), seen.insert(hr).inserted, let ra = row.double("RAJ2000"),
+            var rowsByHR: [Int: [TAPClient.Row]] = [:]
+            var order: [Int] = []
+            for row in rows {
+                guard let hr = row.int("HR") else { continue }
+                if rowsByHR[hr] == nil { order.append(hr) }
+                rowsByHR[hr, default: []].append(row)
+            }
+            let stars = order.compactMap { hr -> NakedEyeStar? in
+                guard let candidates = rowsByHR[hr], let row = candidates.first, let ra = row.double("RAJ2000"),
                       let dec = row.double("DEJ2000"), let v = row.double("Vmag")
                 else { return nil }
+                if let quiescent = novae.value(nearRA: ra, dec: dec), quiescent > 6 { return nil }
+                let hip = hipparcos.match(raDeg: ra, decDeg: dec, joined: candidates)
                 let hd = row.int("HD")
                 let type = row["SpType"].map { $0.trimmingCharacters(in: .whitespaces) }
                 return NakedEyeStar(
                     id: hr, properName: hd.flatMap { names?[$0] }, designation: row["Name"].flatMap(Constellation.designation),
                     hd: hd, raDeg: ra, decDeg: dec, magnitude: v,
                     bMinusV: row.double("B-V"), spectralType: type?.isEmpty == false ? type : nil,
-                    parallaxMas: row.double("Plx"), parallaxErrorMas: row.double("e_Plx"),
+                    parallaxMas: hip?.double("Plx"), parallaxErrorMas: hip?.double("e_Plx"),
                     angularDiameterMas: diameters.value(nearRA: ra, dec: dec),
                     measuredTemperatureK: temperatures.value(nearRA: ra, dec: dec),
                     // Hipparcos where matched; the Bright Star Catalogue's own are in arcsec/yr.
-                    pmRAMasPerYear: row.double("pmRA") ?? row.double("bpmRA").map { $0 * 1000 },
-                    pmDecMasPerYear: row.double("pmDE") ?? row.double("bpmDE").map { $0 * 1000 },
+                    pmRAMasPerYear: hip?.double("pmRA") ?? row.double("bpmRA").map { $0 * 1000 },
+                    pmDecMasPerYear: hip?.double("pmDE") ?? row.double("bpmDE").map { $0 * 1000 },
                     radialVelocityKmS: row.double("RadVel")
                 )
             }
@@ -349,7 +474,8 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
         }
     }
 
-    /// Values looked up by sky position: the entry within 1′ of a position, if any.
+    /// Values looked up by sky position: the nearest entry within 1′ (or a smaller radius, in
+    /// degrees) of a position, if any.
     private struct PositionIndex {
         private var cells: [SIMD2<Int>: [(ra: Double, dec: Double, value: Double)]] = [:]
 
@@ -357,14 +483,14 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
             for e in entries { cells[Self.cell(e.ra, e.dec), default: []].append(e) }
         }
 
-        func value(nearRA ra: Double, dec: Double) -> Double? {
+        func value(nearRA ra: Double, dec: Double, within radius: Double = 1.0 / 60) -> Double? {
             let c = Self.cell(ra, dec)
             var best: (separation: Double, value: Double)?
             for dx in -1...1 { for dy in -1...1 {
                 for e in cells[c &+ SIMD2(dx, dy)] ?? [] {
                     let dRA = (e.ra - ra) * cos(dec * .pi / 180), dDec = e.dec - dec
                     let separation = (dRA * dRA + dDec * dDec).squareRoot()
-                    if separation < 1.0 / 60, separation < (best?.separation ?? .infinity) { best = (separation, e.value) }
+                    if separation < radius, separation < (best?.separation ?? .infinity) { best = (separation, e.value) }
                 }
             } }
             return best?.value
@@ -373,16 +499,56 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
         private static func cell(_ ra: Double, _ dec: Double) -> SIMD2<Int> { SIMD2(Int(floor(ra * 10)), Int(floor(dec * 10))) }
     }
 
+    /// Picks the Hipparcos (new reduction) entry for a Bright Star Catalogue star. The HD join alone
+    /// fails two ways: the components of a close double share one Hipparcos entry filed under only
+    /// one HD number (Castor A, α² Cru and Izar get nothing), and an HD number can lead to the wrong
+    /// star of a wide pair (8 Lac A got 8 Lac B, 22″ away). So the joined entry nearest the star is
+    /// used, and when there is none, or it's over 15″ off, the nearest bright Hipparcos entry within
+    /// 10″ instead. Positions are brought from the Hipparcos epoch (J1991.25) to J2000 with their
+    /// proper motions; a fast-orbiting double like α Cen still drifts ~10″, hence the margin.
+    private struct HipparcosIndex {
+        private let entries: [TAPClient.Row]
+        private let index: PositionIndex
+
+        init(_ rows: [TAPClient.Row]) {
+            entries = rows
+            index = PositionIndex(rows.enumerated().compactMap { i, row in
+                Self.j2000(row).map { ($0.ra, $0.dec, Double(i)) }
+            })
+        }
+
+        func match(raDeg ra: Double, decDeg dec: Double, joined: [TAPClient.Row]) -> TAPClient.Row? {
+            let byHD = joined.compactMap { row in
+                Self.j2000(row).map { (row: row, separation: Self.separation($0.ra, $0.dec, ra, dec)) }
+            }.min { $0.separation < $1.separation }
+            if let byHD, byHD.separation <= 15.0 / 3600 { return byHD.row }
+            if let i = index.value(nearRA: ra, dec: dec, within: 10.0 / 3600) { return entries[Int(i)] }
+            return byHD?.row
+        }
+
+        private static func j2000(_ row: TAPClient.Row) -> (ra: Double, dec: Double)? {
+            guard row["HIP"]?.isEmpty == false, let ra = row.double("RArad"), let dec = row.double("DErad") else { return nil }
+            let years = 8.75, masPerDegree = 3.6e6
+            return (ra + (row.double("pmRA") ?? 0) * years / masPerDegree / cos(dec * .pi / 180),
+                    dec + (row.double("pmDE") ?? 0) * years / masPerDegree)
+        }
+
+        private static func separation(_ ra1: Double, _ dec1: Double, _ ra2: Double, _ dec2: Double) -> Double {
+            let dRA = (ra1 - ra2) * cos(dec2 * .pi / 180), dDec = dec1 - dec2
+            return (dRA * dRA + dDec * dDec).squareRoot()
+        }
+    }
+
     // MARK: Sun and constellations
 
     func sun() async throws -> SunDetails {
-        try await cached(DiskCache<SunDetails>(name: "horizons-sun"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<SunDetails>(name: "horizons-sun-v2"), maxAge: Self.catalogAge) {
             try await self.horizons.loadSun()
         }
     }
 
     func constellations() async throws -> ConstellationBoundaries {
-        try await cached(DiskCache<ConstellationBoundaries>(name: "iau-constellations"), maxAge: 365 * 86400) {
+        try await cached(DiskCache<ConstellationBoundaries>(name: "iau-constellations-v2"), maxAge: 365 * 86400) {
             let url = URL(string: "https://cdsarc.cds.unistra.fr/ftp/VI/42/data.dat")!
             let (data, response) = try await URLSession.shared.data(from: url)
             let boundaries = ConstellationBoundaries.parse(String(decoding: data, as: UTF8.self))
@@ -396,7 +562,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     // MARK: Galaxy colors
 
     func galaxyColors() async throws -> GalaxyColors {
-        try await cached(DiskCache<GalaxyColors>(name: "rc3-colors"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<GalaxyColors>(name: "rc3-colors-v2"), maxAge: Self.catalogAge) {
             let rows = try await TAPClient.vizier.query("""
                 SELECT PGC, T, "B-VoT" FROM "VII/155/rc3" WHERE T IS NOT NULL OR "B-VoT" IS NOT NULL
                 """)
@@ -426,7 +592,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
             let rows = try await TAPClient.simbad.query("""
                 SELECT i.id AS pgc, b.morph_type FROM ident AS i JOIN basic AS b ON b.oid = i.oidref \
                 WHERE i.id IN (\(ids)) AND b.morph_type IS NOT NULL
-                """)
+                """, timeout: 20)
             for row in rows {
                 guard let text = row["pgc"], let id = Int(text.filter(\.isNumber)), let type = row["morph_type"], !type.isEmpty else { continue }
                 types[id] = type
@@ -445,7 +611,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                 SELECT i1.id AS pgc, i2.id AS name FROM ident AS i1 JOIN ident AS i2 ON i1.oidref = i2.oidref \
                 WHERE i1.id IN (\(ids)) AND (i2.id LIKE 'NAME %' OR i2.id LIKE 'M %' OR i2.id LIKE 'NGC %' \
                 OR i2.id LIKE 'IC %' OR i2.id LIKE 'UGC %')
-                """)
+                """, timeout: 20)
             for row in rows {
                 guard let pgcText = row["pgc"], let id = Int(pgcText.filter(\.isNumber)), let raw = row["name"] else { continue }
                 let name = raw.split(separator: " ").joined(separator: " ")
@@ -478,7 +644,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
             SELECT b.main_id, i.id AS name, b.ra, b.dec, b.rvz_redshift, b.otype FROM basic AS b \
             JOIN ident AS i ON i.oidref = b.oid \
             WHERE b.otype IN ('ClG', 'GrG') AND i.id LIKE 'NAME %' AND b.rvz_redshift < 0.05
-            """)
+            """, timeout: 30)
 
         // One entry per cluster: its main name if that is a proper name, else its longest alias
         // ("Fornax Cluster" over "For Cluster").
@@ -526,17 +692,20 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
 
     /// Every group, host star and planet list has at least one entry, so an empty result means the
     /// query went wrong; throwing keeps it out of the cache.
-    private static func nonEmpty<T>(_ what: String, _ items: [T]) throws -> [T] {
+    static func nonEmpty<T>(_ what: String, _ items: [T]) throws -> [T] {
         guard !items.isEmpty else { throw CatalogError.unreadable(what) }
         return items
     }
 
     /// A fresh cached value, else a new fetch (saved), else a stale cached value.
-    private func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
+    /// `isComplete` says whether a fetched value is whole. One missing extras (because a service
+    /// was slow) is shown but not saved, so the next visit tries again.
+    func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, isComplete: () -> Bool = { true },
+                            fetch: () async throws -> T) async throws -> T {
         if let fresh = cache.load(maxAge: maxAge) { return fresh }
         do {
             let value = try await fetch()
-            cache.save(value)
+            if isComplete() { cache.save(value) }
             return value
         } catch {
             if let stale = cache.load() { return stale }

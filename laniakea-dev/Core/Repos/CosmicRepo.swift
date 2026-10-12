@@ -1,8 +1,10 @@
-protocol CosmicRepo {
+protocol CosmicRepo: BlackHoleRepo {
     /// Galaxy groups inside Laniakea, with its outline.
     func laniakea() async throws -> LaniakeaMap
     /// How matter flows through Laniakea, and the cosmic web around it (Cosmicflows-4).
     func laniakeaFlow() async throws -> LaniakeaFlow
+    /// The Milky Way, Andromeda, Triangulum and their dwarf galaxies (Local Volume Database).
+    func localGroup() async throws -> LocalGroup
     /// The galaxies with measured distances in a group.
     func galaxies(in group: GalaxyGroup) async throws -> [Galaxy]
     /// Stars in the Milky Way with confirmed planets.
