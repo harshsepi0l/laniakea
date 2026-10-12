@@ -1,9 +1,13 @@
+import CoreImage
 import simd
 import SwiftUI
 
 /// An Obsidian-style graph of real objects at their real positions seen from above: glowing dots,
 /// links to neighbours, and selection that highlights a dot's links. Pinch to zoom, drag to pan,
 /// tap a dot to select it, tap it again (or Open) to go inside, or tap the info button for its facts.
+///
+/// The map is drawn with Metal (`GraphRenderer`), which moves with the camera at no cost per object;
+/// names are drawn on top by SwiftUI once the map comes to rest.
 struct CosmicGraphView: View {
     let scene: GraphScene
     @Binding var focusID: String?
@@ -13,24 +17,45 @@ struct CosmicGraphView: View {
     let onFacts: (FactSubject) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    /// Draws the map and holds the live camera, which gestures move without touching SwiftUI state.
+    @State private var renderer = GraphRenderer()
+    /// Where the camera was when the map last came to rest; names and the scale bar use these.
     @State private var zoom: CGFloat = 1
-    @State private var zoomStart: CGFloat?
     @State private var pan: CGSize = .zero
-    @State private var panStart: CGSize?
+    /// The map is being dragged, pinched or animated; names hide until it stops.
+    @State private var isMoving = false
     @State private var selected: Int?
-    @State private var showObjects = false
+    /// Laniakea's soft orange fill, blurred once into an image instead of on every frame.
+    @State private var regionImage: RegionImage?
+    /// How many objects the filter shows, counted when the filter changes rather than every frame.
+    @State private var shownCount: Int?
+    /// The objects list, switched from Atlas's controls.
+    @Binding var showObjects: Bool
+    /// Space under the scale bar and caption: level with the search button, or above the open
+    /// search field.
+    var bottomInset: CGFloat = AtlasChrome.bottomInset
 
     private static let maxZoom: CGFloat = 4000
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topTrailing) {
+                GraphMetalView(renderer: renderer, content: GraphRenderer.Content(
+                    scene: scene, visible: visible, selected: selected, dark: colorScheme == .dark, regionImage: regionImage
+                ))
+                .allowsHitTesting(false)
                 Canvas { context, size in
-                    draw(in: &context, size: size)
+                    drawLabels(in: &context, size: size)
                 }
-                // Fade the top edge so objects don't stop at a hard line under the filter row.
-                .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.05)],
-                                     startPoint: .top, endPoint: .bottom))
+                .opacity(isMoving ? 0 : 1)
+                .allowsHitTesting(false)
+                // Fade the top edge so objects don't stop at a hard line under the status bar.
+                LinearGradient(colors: [Color(.systemBackground), Color(.systemBackground).opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: geo.size.height * 0.05)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
+                // Takes the touches for the map.
+                Color.clear
                 .contentShape(Rectangle())
                 .gesture(
                     SpatialTapGesture().onEnded { value in
@@ -48,36 +73,56 @@ struct CosmicGraphView: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 6)
                         .onChanged { value in
-                            let start = panStart ?? pan
-                            panStart = start
-                            pan = CGSize(width: start.width + value.translation.width, height: start.height + value.translation.height)
+                            let camera = renderer.camera
+                            let start = camera.panStart ?? camera.pan
+                            camera.panStart = start
+                            camera.pan = CGSize(width: start.width + value.translation.width, height: start.height + value.translation.height)
+                            camera.changed()
+                            if !isMoving { isMoving = true }
                         }
-                        .onEnded { _ in panStart = nil }
+                        .onEnded { _ in
+                            renderer.camera.panStart = nil
+                            if renderer.camera.zoomStart == nil { settle() }
+                        }
                 )
                 .simultaneousGesture(
                     MagnifyGesture()
                         .onChanged { value in zoomAround(value.startLocation, magnification: value.magnification, size: geo.size) }
-                        .onEnded { _ in zoomStart = nil; panStart = nil }
+                        .onEnded { _ in
+                            renderer.camera.zoomStart = nil
+                            renderer.camera.panStart = nil
+                            settle()
+                        }
                 )
 
                 objectsPanel(size: geo.size)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .padding(.top, AtlasChrome.panelTop)
+                    .padding(.bottom, AtlasChrome.panelBottom)
 
                 VStack(alignment: .leading, spacing: 10) {
                     Spacer()
+                    // The scale stays above the picked object's card, which sits by the search button.
+                    scaleBar(size: geo.size)
                     if let selected {
                         selectionCard(scene.nodes[selected])
                     }
-                    scaleBar(size: geo.size)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.leading, 16)
+                // Clear of the search button in the bottom-right corner.
+                .padding(.trailing, AtlasChrome.cornerButton + 24)
+                .padding(.bottom, bottomInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .allowsHitTesting(selected != nil)
+                .animation(.easeInOut(duration: 0.2), value: bottomInset)
             }
             .onChange(of: visible) { _, _ in
                 if let selected, !isVisible(selected) { self.selected = nil }
+                countShown()
+            }
+            .onAppear { countShown() }
+            .task(id: scene.region?.cells.count) {
+                guard let region = scene.region else { return }
+                regionImage = await Task.detached(priority: .userInitiated) { RegionImage(region) }.value
             }
             .onChange(of: focusID) { _, id in
                 guard let id, let index = scene.nodes.firstIndex(where: { $0.id == id }) else { return }
@@ -119,6 +164,15 @@ struct CosmicGraphView: View {
 
     private func isVisible(_ i: Int) -> Bool { visible?[i] ?? true }
 
+    /// The map has stopped: names and the scale bar catch up with the camera.
+    private func settle() {
+        let camera = renderer.camera
+        guard camera.panStart == nil, camera.zoomStart == nil, !camera.isAnimating else { return }
+        zoom = camera.zoom
+        pan = camera.pan
+        isMoving = false
+    }
+
     private func node(at point: CGPoint, size: CGSize) -> Int? {
         let scale = baseScale(size) * Double(zoom)
         var best: (Int, CGFloat)?
@@ -131,18 +185,21 @@ struct CosmicGraphView: View {
     }
 
     private func zoomAround(_ anchor: CGPoint, magnification: CGFloat, size: CGSize) {
-        let startZoom = zoomStart ?? zoom
-        let startPan = panStart ?? pan
-        zoomStart = startZoom
-        panStart = startPan
+        let camera = renderer.camera
+        let startZoom = camera.zoomStart ?? camera.zoom
+        let startPan = camera.panStart ?? camera.pan
+        camera.zoomStart = startZoom
+        camera.panStart = startPan
         let newZoom = min(max(startZoom * magnification, 0.5), Self.maxZoom)
         let ratio = newZoom / startZoom
         let cx = size.width / 2, cy = size.height / 2
-        zoom = newZoom
-        pan = CGSize(
+        camera.zoom = newZoom
+        camera.pan = CGSize(
             width: anchor.x - cx - (anchor.x - cx - startPan.width) * ratio,
             height: anchor.y - cy - (anchor.y - cy - startPan.height) * ratio
         )
+        camera.changed()
+        if !isMoving { isMoving = true }
     }
 
     /// Selects a node and moves it to the centre, zooming in if it's lost among its neighbours.
@@ -154,122 +211,24 @@ struct CosmicGraphView: View {
             // At least ~60 points to the nearest linked neighbour.
             target = min(max(zoom, CGFloat(60 / (nearest * baseScale(size)))), Self.maxZoom)
         }
-        withAnimation(.easeInOut(duration: 0.35)) {
-            zoom = target
-            let scale = baseScale(size) * Double(target)
-            pan = CGSize(width: -CGFloat((p.x - scene.fitCenter.x) * scale), height: CGFloat((p.y - scene.fitCenter.y) * scale))
-            selected = index
-        }
+        let scale = baseScale(size) * Double(target)
+        let targetPan = CGSize(width: -CGFloat((p.x - scene.fitCenter.x) * scale), height: CGFloat((p.y - scene.fitCenter.y) * scale))
+        isMoving = true
+        renderer.camera.animate(toZoom: target, pan: targetPan) { settle() }
+        withAnimation(.easeInOut(duration: 0.35)) { selected = index }
     }
 
     // MARK: Drawing
 
-    private var ink: Color { colorScheme == .dark ? .white : Color(white: 0.07) }
-    /// Objects whose color hasn't been measured.
-    private var unknown: Color { Color(white: colorScheme == .dark ? 0.62 : 0.42) }
     private var here: Color {
         colorScheme == .dark ? Color(red: 1.0, green: 0.69, blue: 0.36) : Color(red: 1.0, green: 0.48, blue: 0.10)
     }
 
-    private func draw(in context: inout GraphicsContext, size: CGSize) {
-        let dark = colorScheme == .dark
+    /// Names, worked out for where the map came to rest (hidden while it moves).
+    private func drawLabels(in context: inout GraphicsContext, size: CGSize) {
         let scale = baseScale(size) * Double(zoom)
-        let bounds = CGRect(origin: .zero, size: size).insetBy(dx: -40, dy: -40)
         let points = scene.nodes.map { screenPoint($0.position, size: size, scale: scale) }
         let highlight: Set<Int> = selected.map { scene.neighbors(of: $0).union([$0]) } ?? []
-
-        // Region (Laniakea's outline): the union of its cells, filled once so overlaps don't darken.
-        if let region = scene.region {
-            var path = Path()
-            let side = CGFloat(region.cellSize * scale)
-            for cell in region.cells {
-                let c = screenPoint(cell, size: size, scale: scale)
-                path.addRect(CGRect(x: c.x - side / 2, y: c.y - side / 2, width: side + 0.5, height: side + 0.5))
-            }
-            // Blurred by more than half a cell so the 10 Mpc cells read as one soft shape, not steps.
-            var soft = context
-            soft.addFilter(.blur(radius: max(side * 0.65, 2)))
-            soft.fill(path, with: .color(here.opacity(dark ? 0.13 : 0.12)))
-        }
-        // Laniakea's edge: a soft orange glow under a crisp line.
-        if !scene.regionOutline.isEmpty {
-            var edge = Path()
-            for (a, b) in scene.regionOutline {
-                edge.move(to: screenPoint(a, size: size, scale: scale))
-                edge.addLine(to: screenPoint(b, size: size, scale: scale))
-            }
-            var glow = context
-            glow.addFilter(.blur(radius: 4))
-            glow.stroke(edge, with: .color(here.opacity(0.55)), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-            context.stroke(edge, with: .color(here.opacity(0.9)), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
-        }
-
-        // Links.
-        var links = Path()
-        var lit = Path()
-        for (a, b) in scene.links where isVisible(a) && isVisible(b) {
-            let pa = points[a], pb = points[b]
-            guard bounds.contains(pa) || bounds.contains(pb) else { continue }
-            if let selected, a == selected || b == selected {
-                lit.move(to: pa); lit.addLine(to: pb)
-            } else {
-                links.move(to: pa); links.addLine(to: pb)
-            }
-        }
-        context.stroke(links, with: .color(ink.opacity((dark ? 0.11 : 0.09) * (selected == nil ? 1 : 0.5))), lineWidth: 0.6)
-        context.stroke(lit, with: .color(here.opacity(0.8)), lineWidth: 1.3)
-
-        // Dots, batched by color bin and style. Every star, galaxy and group takes its color from the
-        // shared star color scale; objects with no measured color are grey. Where you are and the
-        // selection keep their color and get an orange ring.
-        enum Style: Int { case normal, faint, muted, dimmed }
-        var batches: [Int?: [Style: Path]] = [:]
-        var rings = Path(), homeRings = Path(), plainAccent = Path()
-        for (i, n) in scene.nodes.enumerated() where isVisible(i) {
-            let p = points[i]
-            guard bounds.contains(p) else { continue }
-            let r = dotRadius(n)
-            let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
-            let isAccent = n.isHere || i == selected
-            let bin = n.temperatureK.map { StarColor.bin(temperature: $0) }
-            let color = bin.map { StarColor.color(bin: $0).color(dark: dark) } ?? unknown
-            if isAccent || n.size > 0.55 {
-                let glow = r * 3.4
-                context.fill(
-                    Path(ellipseIn: CGRect(x: p.x - glow, y: p.y - glow, width: glow * 2, height: glow * 2)),
-                    with: .radialGradient(Gradient(colors: [color.opacity(isAccent ? 0.45 : (dark ? 0.24 : 0.14)), color.opacity(0)]),
-                                          center: p, startRadius: 0, endRadius: glow)
-                )
-            }
-            if isAccent {
-                // Where you are gets a wider double ring so it stands out in dense fields.
-                if n.isHere {
-                    homeRings.addEllipse(in: rect.insetBy(dx: -4, dy: -4))
-                    homeRings.addEllipse(in: rect.insetBy(dx: -9, dy: -9))
-                } else {
-                    rings.addEllipse(in: rect.insetBy(dx: -3, dy: -3))
-                }
-                if bin == nil { plainAccent.addEllipse(in: rect) } else { batches[bin, default: [:]][.normal, default: Path()].addEllipse(in: rect) }
-                continue
-            }
-            let style: Style = selected != nil && !highlight.contains(i) ? .dimmed
-                : n.isMuted ? .muted
-                : n.size < detailThreshold && !highlight.contains(i) ? .faint : .normal
-            batches[bin, default: [:]][style, default: Path()].addEllipse(in: rect)
-        }
-        let opacity: [Style: Double] = [.normal: 1, .faint: 0.6, .muted: 0.32, .dimmed: 0.2]
-        for (bin, styles) in batches {
-            let color = bin.map { StarColor.color(bin: $0).color(dark: dark) } ?? unknown
-            for (style, path) in styles.sorted(by: { $0.key.rawValue > $1.key.rawValue }) {
-                context.fill(path, with: .color(color.opacity(opacity[style] ?? 1)))
-            }
-        }
-        context.fill(plainAccent, with: .color(here))
-        context.stroke(rings, with: .color(here), lineWidth: 1.6)
-        // A background-colored band under the rings separates them from red and orange stars nearby.
-        context.stroke(homeRings, with: .color(Color(.systemBackground).opacity(0.85)), lineWidth: 5)
-        context.stroke(homeRings, with: .color(here), lineWidth: 2)
-
         drawLabels(in: &context, points: points, size: size, highlight: highlight)
     }
 
@@ -357,16 +316,20 @@ struct CosmicGraphView: View {
             }
         }
         .padding(14)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
+        .atlasGlass(RoundedRectangle(cornerRadius: 22))
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var captionText: String {
-        guard let visible else { return scene.caption }
+        guard visible != nil, let shownCount else { return scene.caption }
+        let total = scene.nodes.count - scene.nodes.filter(\.isHere).count
+        return "Showing \(shownCount.formatted()) of \(total.formatted()) with the current filter. \(scene.caption)"
+    }
+
+    private func countShown() {
+        guard let visible else { shownCount = nil; return }
         // Where you are always shows, so it isn't counted.
-        let objects = scene.nodes.indices.filter { !scene.nodes[$0].isHere }
-        let shown = objects.filter { visible[$0] }.count
-        return "Showing \(shown.formatted()) of \(objects.count.formatted()) with the current filter. \(scene.caption)"
+        shownCount = scene.nodes.indices.filter { !scene.nodes[$0].isHere && visible[$0] }.count
     }
 
     private func scaleBar(size: CGSize) -> some View {
@@ -405,19 +368,7 @@ struct CosmicGraphView: View {
             return na.size > nb.size
         }
         return HStack(alignment: .top, spacing: 0) {
-            if !showObjects {
-                Button {
-                    showObjects = true
-                } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(Color(.systemGray6), in: Circle())
-                }
-                .accessibilityLabel("Show objects")
-                .padding(.trailing, 16)
-            } else {
+            if showObjects {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Text("\(ranked.count.formatted()) objects")
@@ -475,5 +426,45 @@ struct CosmicGraphView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: showObjects)
+    }
+}
+
+/// A region's cells filled and blurred once, at a fixed resolution in layout units, so drawing it is
+/// a single image instead of thousands of squares and a full-screen blur on every frame.
+struct RegionImage {
+    let image: CGImage
+    /// Layout position of the image's top-left corner, and its size in layout units.
+    let topLeft: SIMD2<Double>
+    let size: SIMD2<Double>
+
+    init?(_ region: (cells: [SIMD2<Double>], cellSize: Double)) {
+        guard let first = region.cells.first else { return nil }
+        var lo = first, hi = first
+        for c in region.cells { lo = simd_min(lo, c); hi = simd_max(hi, c) }
+        // Blurred by more than half a cell, as before, with room around it for the blur to fade out.
+        let blur = region.cellSize * 0.65
+        let margin = region.cellSize / 2 + blur * 3
+        lo -= SIMD2(repeating: margin)
+        hi += SIMD2(repeating: margin)
+        let span = hi - lo
+        let pixelsPerUnit = 1400 / max(span.x, span.y)
+        let width = Int((span.x * pixelsPerUnit).rounded(.up)), height = Int((span.y * pixelsPerUnit).rounded(.up))
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        let side = region.cellSize * pixelsPerUnit
+        // Bitmap y runs up, like layout y, so the image comes out the right way up.
+        for c in region.cells {
+            context.fill(CGRect(x: (c.x - lo.x) * pixelsPerUnit - side / 2, y: (c.y - lo.y) * pixelsPerUnit - side / 2,
+                                width: side + 0.5, height: side + 0.5))
+        }
+        guard let sharp = context.makeImage() else { return nil }
+        let input = CIImage(cgImage: sharp)
+        let blurred = input.clampedToExtent().applyingGaussianBlur(sigma: blur * pixelsPerUnit).cropped(to: input.extent)
+        guard let image = CIContext().createCGImage(blurred, from: input.extent) else { return nil }
+        self.image = image
+        topLeft = SIMD2(lo.x, hi.y)
+        size = span
     }
 }
