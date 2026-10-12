@@ -70,7 +70,13 @@ enum SkyCoordinates {
     /// Precesses an equatorial J2000 direction to the equator and equinox of 1875, the frame the IAU
     /// constellation boundaries were drawn in. IAU 1976 precession angles (Lieske et al. 1977).
     static func precessToB1875(_ v: SIMD3<Double>) -> SIMD3<Double> {
-        let t = (2_405_889.258_55 - 2_451_545.0) / 36525
+        precess(v, toJulianDay: 2_405_889.258_55)
+    }
+
+    /// Precesses an equatorial J2000 direction to the equator and equinox of another date, with the
+    /// IAU 1976 angles. From J2000 to today it's a few tenths of a degree.
+    static func precess(_ v: SIMD3<Double>, toJulianDay jd: Double) -> SIMD3<Double> {
+        let t = (jd - 2_451_545.0) / 36525
         let arcsec = Double.pi / 180 / 3600
         let zeta = (2306.2181 * t + 0.30188 * t * t + 0.017998 * t * t * t) * arcsec
         let z = (2306.2181 * t + 1.09468 * t * t + 0.018203 * t * t * t) * arcsec

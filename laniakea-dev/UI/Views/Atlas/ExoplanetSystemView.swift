@@ -214,28 +214,43 @@ struct ExoplanetDetailSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 10) {
-                        if let makeup = planet.composition {
-                            let color = makeup.swiftUI(dark: colorScheme == .dark)
-                            Circle().fill(color).frame(width: 16, height: 16).shadow(color: color.opacity(0.7), radius: 6)
+            VStack(alignment: .leading, spacing: 0) {
+                if let header { FactHeaderView(header: header) }
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            if let makeup = planet.composition {
+                                let color = makeup.swiftUI(dark: colorScheme == .dark)
+                                Circle().fill(color).frame(width: 16, height: 16).shadow(color: color.opacity(0.7), radius: 6)
+                            }
+                            Text(planet.name).font(.system(size: 30, weight: .bold))
                         }
-                        Text(planet.name).font(.system(size: 30, weight: .bold))
+                        Text(summary).font(.system(size: 16)).foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text(summary).font(.system(size: 16)).foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    FactGrid(facts: facts)
+                    if planet.equilibriumTempK != nil {
+                        Text("Temperature assumes no atmosphere to trap heat, as the archive calculates it.")
+                            .font(.system(size: 13)).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text("Source: NASA Exoplanet Archive").font(.system(size: 12)).foregroundColor(.secondary)
                 }
-                FactGrid(facts: facts)
-                if planet.equilibriumTempK != nil {
-                    Text("Temperature assumes no atmosphere to trap heat, as the archive calculates it.")
-                        .font(.system(size: 13)).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Text("Source: NASA Exoplanet Archive").font(.system(size: 12)).foregroundColor(.secondary)
+                .padding(20)
             }
-            .padding(20)
         }
         .factSheetPresentation()
+    }
+
+    /// The planet beside Earth, or beside Jupiter when it's a giant, at true relative size.
+    private var header: FactHeader? {
+        guard let r = planet.radiusEarths, r > 0 else { return nil }
+        let estimate = planet.radiusIsEstimate == true
+        let me = FactHeader.ScaleBody(name: planet.name, radius: r, look: .planet(planet.composition), isEstimate: estimate)
+        // Jupiter's mean radius is 11.0 Earth radii (69,911 km / 6,371 km).
+        let reference = r < 4
+            ? FactHeader.ScaleBody(name: "Earth", radius: 1, look: .planet(.rocky))
+            : FactHeader.ScaleBody(name: "Jupiter", radius: 69_911.0 / 6_371.0, look: .planet(.gasRich))
+        return .toScale([me, reference])
     }
 
     private var facts: [FactSheet.Fact] {

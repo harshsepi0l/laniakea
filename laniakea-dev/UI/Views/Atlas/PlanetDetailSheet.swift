@@ -10,66 +10,79 @@ struct PlanetDetailSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(planet.name)
-                        .font(.system(size: 30, weight: .bold))
-                    Text(orbitSummary)
-                        .font(.system(size: 16))
+            VStack(alignment: .leading, spacing: 0) {
+                if let header { FactHeaderView(header: header) }
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(planet.name)
+                            .font(.system(size: 30, weight: .bold))
+                        Text(orbitSummary)
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if distanceFromSunAU != nil || distanceFromEarthAU != nil {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(distanceDateLabel)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.orange)
+                            if let sun = distanceFromSunAU {
+                                row("From the Sun", Self.distanceText(au: sun))
+                            }
+                            if let earth = distanceFromEarthAU {
+                                row("From Earth", Self.distanceText(au: earth))
+                            }
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                        if let radius = planet.meanRadiusKm {
+                            fact("Diameter", "\(Self.number(radius * 2)) km")
+                        }
+                        if let mass = planet.massKg {
+                            fact("Mass", Self.scientific(mass, unit: "kg"))
+                        }
+                        if let gravity = planet.surfaceGravity {
+                            fact(planet.temperatureIsAtOneBar ? "Gravity (cloud tops)" : "Surface gravity", "\(Self.number(gravity, digits: 1)) m/s²")
+                        }
+                        if let density = planet.densityGramsPerCm3 {
+                            fact("Density", "\(Self.number(density, digits: 2)) g/cm³")
+                        }
+                        if let rotation = planet.rotationPeriodHours {
+                            fact("Spins once every", Self.duration(hours: rotation))
+                        }
+                        fact("Length of year", Self.duration(hours: planet.orbit.periodDays * 24))
+                        if let kelvin = planet.temperatureK {
+                            fact(planet.temperatureIsAtOneBar ? "Temperature (cloud tops)" : "Average temperature", "\(Self.number(kelvin - 273.15)) °C")
+                        }
+                        if let tilt = planet.axialTiltDeg {
+                            fact("Axial tilt", "\(Self.number(tilt, digits: tilt < 1 ? 2 : 1))°")
+                        }
+                    }
+
+                    Text("Source: NASA JPL Horizons")
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                if distanceFromSunAU != nil || distanceFromEarthAU != nil {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(distanceDateLabel)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.orange)
-                        if let sun = distanceFromSunAU {
-                            row("From the Sun", Self.distanceText(au: sun))
-                        }
-                        if let earth = distanceFromEarthAU {
-                            row("From Earth", Self.distanceText(au: earth))
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                    if let radius = planet.meanRadiusKm {
-                        fact("Diameter", "\(Self.number(radius * 2)) km")
-                    }
-                    if let mass = planet.massKg {
-                        fact("Mass", Self.scientific(mass, unit: "kg"))
-                    }
-                    if let gravity = planet.surfaceGravity {
-                        fact(planet.temperatureIsAtOneBar ? "Gravity (cloud tops)" : "Surface gravity", "\(Self.number(gravity, digits: 1)) m/s²")
-                    }
-                    if let density = planet.densityGramsPerCm3 {
-                        fact("Density", "\(Self.number(density, digits: 2)) g/cm³")
-                    }
-                    if let rotation = planet.rotationPeriodHours {
-                        fact("Spins once every", Self.duration(hours: rotation))
-                    }
-                    fact("Length of year", Self.duration(hours: planet.orbit.periodDays * 24))
-                    if let kelvin = planet.temperatureK {
-                        fact(planet.temperatureIsAtOneBar ? "Temperature (cloud tops)" : "Average temperature", "\(Self.number(kelvin - 273.15)) °C")
-                    }
-                    if let tilt = planet.axialTiltDeg {
-                        fact("Axial tilt", "\(Self.number(tilt, digits: tilt < 1 ? 2 : 1))°")
-                    }
-                }
-
-                Text("Source: NASA JPL Horizons")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                .padding(20)
             }
-            .padding(20)
         }
         .factSheetPresentation()
+    }
+
+    /// NASA's photo, or if it can't load, the planet drawn to scale beside Earth.
+    private var header: FactHeader? {
+        guard var photo = CelestialPhotos.solarSystem[planet.id] else { return nil }
+        photo.fallback = planet.meanRadiusKm.map { r in
+            .toScale([.init(name: planet.name, radius: r, look: .planet(planet.composition))]
+                     + (planet.id == Planet.earthID ? [] : [.init(name: "Earth", radius: 6371, look: .planet(.rocky))]))
+        }
+        return .photo(photo)
     }
 
     private func row(_ label: String, _ value: String) -> some View {

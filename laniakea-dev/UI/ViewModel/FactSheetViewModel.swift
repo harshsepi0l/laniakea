@@ -43,9 +43,26 @@ final class FactSheetViewModel: ObservableObject {
                 data.sun = try? await sun
                 data.galaxyColors = try? await colors
             case .starSystem(let s):
+                async let bright = s.hd == nil ? nil : (try? repo.nakedEyeStars())?.first { $0.hd == s.hd }
                 data.starDetails = try await repo.details(of: s)
+                data.brightStar = await bright
             case .sun:
                 data.sun = try await repo.sun()
+            case .nakedEyeStar:
+                break
+            case .constellation(let abbreviation):
+                async let starsTask = repo.nakedEyeStars()
+                async let systemsTask = try? repo.starSystems()
+                async let boundsTask = repo.constellations()
+                let (stars, systems, bounds) = try await (starsTask, systemsTask, boundsTask)
+                // About 70,000 boundary lookups: keep them off the main thread.
+                let (profile, hosts) = await Task.detached { () -> (ConstellationProfile?, Int) in
+                    let profile = ConstellationProfile(abbreviation: abbreviation, boundaries: bounds, nakedEye: stars)
+                    let hosts = (systems ?? []).filter { bounds.constellation(of: SkyCoordinates.equatorial(galactic: $0.position)) == abbreviation }.count
+                    return (profile, hosts)
+                }.value
+                data.constellation = profile
+                data.constellationHosts = systems == nil ? nil : hosts
             }
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? "Some facts couldn't be loaded. Check your connection and try again."

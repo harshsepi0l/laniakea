@@ -24,6 +24,7 @@ struct FactSheet {
     var source: String
     /// For stars: surface temperature, which colors the dot beside the title.
     var temperatureK: Double?
+    var header: FactHeader?
 }
 
 /// Everything a fact sheet can draw on; the extra pieces arrive as they load.
@@ -35,6 +36,11 @@ struct FactSheetData {
     var starDetails: StarDetails?
     var sun: SunDetails?
     var galaxyColors: GalaxyColors?
+    /// The naked-eye star a planet host is, if it's one, for its proper name.
+    var brightStar: NakedEyeStar?
+    var constellation: ConstellationProfile?
+    /// How many stars with planets lie in the constellation.
+    var constellationHosts: Int?
     var boundaries: ConstellationBoundaries?
 }
 
@@ -45,7 +51,9 @@ enum FactSheetBuilder {
         case .group(let g): return group(g, data.groupDetails, data.boundaries)
         case .galaxy(let g, let groupName): return galaxy(g, groupName: groupName, data.galaxyDetails, data.boundaries)
         case .milkyWay: return milkyWay(data.systems, sun: data.sun, colors: data.galaxyColors)
-        case .starSystem(let s): return star(s, data.starDetails, data.boundaries)
+        case .starSystem(let s): return star(s, data.starDetails, data.boundaries, brightStar: data.brightStar)
+        case .nakedEyeStar(let s): return nakedEyeStar(s, data.boundaries)
+        case .constellation(let abbreviation): return constellation(abbreviation, data.constellation, hosts: data.constellationHosts)
         case .sun: return sun(data.sun)
         }
     }
@@ -109,6 +117,14 @@ enum FactSheetBuilder {
             ))
         }
         sheet.facts.append(.init(label: "In Laniakea", value: g.isOnBoundary ? "On the edge" : "Inside"))
+        if !isHome {
+            // About 1 Mpc of space around the group's centre: wide for Virgo, narrow far away.
+            let sky = SkyCoordinates.spherical(SkyCoordinates.equatorial(supergalactic: g.position))
+            let fov = min(max(1 / g.distanceMpc * 180 / .pi, 0.2), 4)
+            var photo = CelestialPhotos.sky(raDeg: sky.l, decDeg: sky.b, fovDegrees: fov)
+            photo.caption = "\(photo.caption ?? ""), about 3 million light-years at its distance"
+            sheet.header = .photo(photo)
+        }
         if let color = g.color {
             sheet.facts.append(colorFact(color, whose: "its brightest galaxy"))
             sheet.temperatureK = GraphBuilder.colorTemperature(color)
@@ -133,6 +149,15 @@ enum FactSheetBuilder {
             summary: "\(galaxyNoun(kind)) in the \(groupName), \(GraphBuilder.lightYearsText(parsecs: g.distanceMpc * 1e6)) away.",
             source: "Distance: Cosmicflows-4 (Tully et al. 2023). Type and size: SIMBAD. Color: RC3."
         )
+        // Framed at twice its measured width, once SIMBAD's size has arrived; drawn from its
+        // measurements if the photo can't load.
+        if let details {
+            let sky = SkyCoordinates.spherical(SkyCoordinates.equatorial(supergalactic: g.position))
+            let fov = max((details.majorAxisArcmin ?? 4) * 2 / 60, 0.08)
+            var photo = CelestialPhotos.sky(raDeg: sky.l, decDeg: sky.b, fovDegrees: fov)
+            photo.fallback = .galaxyModel(galaxyModel(g, details))
+            sheet.header = .photo(photo)
+        }
         if let morphology {
             sheet.facts.append(.init(label: "Type", value: kind == .unknownGalaxy ? morphology : String(kind.label.dropLast()), detail: kind == .unknownGalaxy ? nil : morphology))
         }
@@ -154,6 +179,51 @@ enum FactSheetBuilder {
             sheet.lists.append(.init(title: "How its distance was measured", items: methods.map(\.name)))
         }
         sheet.notes.append("Visible width is the galaxy's catalogued size on the sky at its measured distance; its faint outskirts reach farther.")
+        return sheet
+    }
+
+    static func galaxyModel(_ g: Galaxy, _ details: GalaxyDetails) -> FactHeader.GalaxyModel {
+        let morphology = details.morphology ?? g.morphology
+        let ratio = details.minorAxisArcmin.flatMap { minor in details.majorAxisArcmin.map { minor / $0 } } ?? 1
+        // The stage letter after S (and an optional bar or ring note), as in "SAB(rs)bc" → b.
+        let stage = morphology.flatMap { $0.firstMatch(of: #/^[a-z]*S[AB]*(?:\([^)]*\))?([abcdm])/#).map { $0.1.first } } ?? nil
+        return .init(type: GalaxyType(morphology: morphology), stage: stage, axisRatio: min(max(ratio, 0.08), 1),
+                     positionAngleDeg: details.positionAngleDeg ?? 0, bMinusV: g.color?.bMinusV, seed: g.id)
+    }
+
+    /// A constellation: its size, stars and planets, with a real wide photo and its IAU boundary.
+    static func constellation(_ abbreviation: String, _ profile: ConstellationProfile?, hosts: Int?) -> FactSheet {
+        let name = Constellation.name(abbreviation)
+        var sheet = FactSheet(
+            title: name,
+            summary: "One of the 88 official regions of the sky, fixed by the IAU in 1930.",
+            source: "Boundaries: IAU (Delporte 1930, Roman 1987). Stars: Yale Bright Star Catalogue, Hipparcos. Photo: DSS2 via CDS."
+        )
+        guard let profile else { return sheet }
+        // Its stars carry the constellation's Latin genitive, as Betelgeuse is α Orionis.
+        if let example = profile.stars.first(where: { $0.designation?.contains(" ") == true && $0.properName != nil }),
+           let designation = example.designation {
+            sheet.summary += " Its stars are named with \(Constellation.genitives[abbreviation] ?? name), as \(example.name) is \(designation)."
+        }
+        var photo = CelestialPhotos.sky(raDeg: profile.centreRA, decDeg: profile.centreDec, fovDegrees: profile.fovDegrees, projection: "ARC")
+        photo.overlay = profile.chart
+        photo.fallback = .skyChart(profile.chart)
+        sheet.header = .photo(photo)
+        sheet.facts.append(.init(label: "Area", value: "\(profile.areaSquareDegrees.formatted(.number.precision(.fractionLength(0)))) square degrees",
+                                 detail: "\((profile.areaSquareDegrees / 41_253 * 100).formatted(.number.precision(.significantDigits(2))))% of the sky"))
+        sheet.facts.append(.init(label: "Stars you can see", value: profile.stars.count.formatted(), detail: "magnitude 6 or brighter"))
+        if let brightest = profile.stars.first {
+            sheet.facts.append(.init(label: "Brightest star", value: brightest.name, detail: "magnitude \(brightest.magnitude.formatted(.number.precision(.fractionLength(1))))"))
+        }
+        if let nearest = profile.stars.filter({ $0.distanceParsecs != nil }).min(by: { $0.distanceParsecs! < $1.distanceParsecs! }) {
+            sheet.facts.append(.init(label: "Nearest of them", value: nearest.name, detail: GraphBuilder.lightYearsText(parsecs: nearest.distanceParsecs!)))
+        }
+        if let hosts { sheet.facts.append(.init(label: "Stars with planets", value: hosts.formatted(), detail: "confirmed, any brightness")) }
+        let named = profile.stars.compactMap(\.properName)
+        sheet.facts.append(.init(label: "Named stars", value: named.count.formatted(), detail: "official IAU names"))
+        let top = profile.stars.prefix(6).map { "\($0.name) · magnitude \($0.magnitude.formatted(.number.precision(.fractionLength(1))))" }
+        if !top.isEmpty { sheet.lists.append(.init(title: "Brightest stars", items: Array(top))) }
+        sheet.notes.append("The photo is a real sky-survey image; the outline and names are drawn on it from the IAU boundaries and the star catalog.")
         return sheet
     }
 
@@ -207,15 +277,21 @@ enum FactSheetBuilder {
         return sheet
     }
 
-    static func star(_ s: StarSystem, _ d: StarDetails?, _ boundaries: ConstellationBoundaries?) -> FactSheet {
+    static func star(_ s: StarSystem, _ d: StarDetails?, _ boundaries: ConstellationBoundaries?, brightStar: NakedEyeStar? = nil) -> FactSheet {
         let kind = ObjectKind.star(spectralType: d?.spectralType ?? s.spectralType, temperatureK: d?.temperatureK ?? s.temperatureK)
         let planets = s.planetCount == 1 ? "1 confirmed planet" : "\(s.planetCount) confirmed planets"
         var sheet = FactSheet(
-            title: s.name,
-            summary: "\(starNoun(kind)) \(GraphBuilder.lightYearsText(parsecs: s.distanceParsecs)) away, with \(planets).",
-            source: "NASA Exoplanet Archive."
+            title: brightStar?.properName ?? s.name,
+            summary: "\(starNoun(kind, spectralType: d?.spectralType ?? s.spectralType)) \(GraphBuilder.lightYearsText(parsecs: s.distanceParsecs)) away, with \(planets).",
+            source: brightStar?.properName != nil ? "NASA Exoplanet Archive. Name: IAU." : "NASA Exoplanet Archive."
         )
+        if let bright = brightStar, bright.properName != nil {
+            sheet.facts.append(.init(label: "Also called", value: bright.designation ?? s.name, detail: bright.designation != nil ? s.name : nil))
+        }
         sheet.temperatureK = d?.temperatureK ?? s.temperatureK
+        if let r = d?.radiusSuns {
+            sheet.header = .toScale(withSun(name: sheet.title, radiusSuns: r, temperatureK: sheet.temperatureK))
+        }
         sheet.facts.append(.init(label: "Distance", value: GraphBuilder.lightYearsText(parsecs: s.distanceParsecs), detail: "\(s.distanceParsecs.formatted(.number.precision(.significantDigits(3)))) parsecs"))
         if let type = d?.spectralType ?? s.spectralType { sheet.facts.append(.init(label: "Spectral type", value: type)) }
         if let t = d?.temperatureK ?? s.temperatureK { sheet.facts.append(.init(label: "Surface temperature", value: "\(t.formatted(.number.precision(.fractionLength(0)))) K")) }
@@ -236,21 +312,108 @@ enum FactSheetBuilder {
         return sheet
     }
 
-    private static func starNoun(_ kind: ObjectKind) -> String {
+    /// "A red supergiant", "An orange giant", "A Sun-like star": the temperature class sets the color
+    /// word and the luminosity class in the spectral type (Ia…V) sets the size word. Without a
+    /// luminosity class only the color is named, since an M star can be a dwarf or a supergiant.
+    private static func starNoun(_ kind: ObjectKind, spectralType: String?) -> String {
         switch kind {
-        case .hotStar: return "A hot star"
-        case .fStar: return "An F-type star"
-        case .gStar: return "A Sun-like star"
-        case .kStar: return "A K-type star"
-        case .mStar: return "A red dwarf"
         case .brownDwarf: return "A brown dwarf"
         case .whiteDwarf: return "A white dwarf"
+        default: break
+        }
+        let color: String
+        switch kind {
+        // The hot classes look different: O blue, B blue-white, A white (Sirius, Vega).
+        case .hotStar:
+            switch spectralType?.first(where: \.isUppercase) {
+            case "O": color = "blue"
+            case "A": color = "white"
+            default: color = "blue-white"
+            }
+        case .fStar: color = "yellow-white"
+        case .gStar: color = "yellow"
+        case .kStar: color = "orange"
+        case .mStar: color = "red"
         default: return "A star"
         }
+        let noun: String
+        switch luminosityClass(spectralType) {
+        case "I": noun = "\(color) supergiant"
+        case "II": noun = "\(color) bright giant"
+        case "III": noun = "\(color) giant"
+        case "IV": noun = "\(color) subgiant"
+        case "V": noun = kind == .gStar ? "Sun-like star" : kind == .mStar ? "red dwarf" : kind == .kStar ? "orange dwarf" : "\(color) main-sequence star"
+        default: noun = "\(color) star"
+        }
+        return (noun.first.map { "AEIOU".contains($0.uppercased()) } == true ? "An " : "A ") + noun
+    }
+
+    /// The luminosity class of a spectral type such as "M1-2Ia-Iab" → "I", "K0IIIb" → "III", "A1Vm" → "V".
+    static func luminosityClass(_ spectralType: String?) -> String? {
+        guard let t = spectralType,
+              let m = t.firstMatch(of: #/^[a-z]*[OBAFGKM][0-9.]*(?:[-/][0-9.]+)?[:+]?\s*(IV|V|I{1,3})/#)
+        else { return nil }
+        return String(m.1)
+    }
+
+    static func nakedEyeStar(_ s: NakedEyeStar, _ boundaries: ConstellationBoundaries?) -> FactSheet {
+        let kind = ObjectKind.star(spectralType: s.spectralType, temperatureK: s.temperatureK)
+        // One rounding for the summary and the distance cell, so they agree; uncertain distances are
+        // rounded to two figures ("500 ± 60").
+        var distanceText: String?, summaryDistance = ""
+        if let d = s.distanceParsecs {
+            let ly = d * 3.2616, error = (s.distanceErrorParsecs ?? 0) * 3.2616
+            let rounded = ly.formatted(.number.precision(.significantDigits(2)))
+            distanceText = error >= 1
+                ? "\(rounded) ± \(error.formatted(.number.precision(.significantDigits(1)))) light-years"
+                : GraphBuilder.lightYearsText(parsecs: d)
+            summaryDistance = error >= 1 ? " about \(rounded) light-years away" : " \(GraphBuilder.lightYearsText(parsecs: d)) away"
+        }
+        var sheet = FactSheet(
+            title: s.name,
+            summary: "\(starNoun(kind, spectralType: s.spectralType))\(summaryDistance), bright enough to see with your eyes. No planets are known around it.",
+            source: "Yale Bright Star Catalogue, Hipparcos (van Leeuwen 2007), JMMC Stellar Diameters Catalogue, PASTEL, IAU star names."
+        )
+        sheet.temperatureK = s.temperatureK
+        if let r = s.radiusSuns {
+            sheet.header = .toScale(withSun(name: s.name, radiusSuns: r, temperatureK: s.temperatureK))
+        }
+        if let designation = s.designation, s.properName != nil {
+            sheet.facts.append(.init(label: "Also called", value: designation))
+        }
+        if let value = distanceText {
+            sheet.facts.append(.init(label: "Distance", value: value, detail: "from its Hipparcos parallax"))
+        } else {
+            sheet.facts.append(.init(label: "Distance", value: "Not well measured", detail: "too far for a precise parallax"))
+        }
+        if let type = s.spectralType { sheet.facts.append(.init(label: "Spectral type", value: type)) }
+        if let t = s.temperatureK {
+            sheet.facts.append(.init(
+                label: "Surface temperature", value: "\(s.measuredTemperatureK == nil ? "≈ " : "")\(t.formatted(.number.precision(.fractionLength(0)))) K",
+                detail: s.measuredTemperatureK == nil ? "estimated from its color" : "median of published measurements"
+            ))
+        }
+        if let r = s.radiusSuns { sheet.facts.append(.init(label: "Width", value: "\(times(r)) × Sun", detail: "from its measured angular size")) }
+        if let l = s.visualLuminositySuns {
+            // An estimate (no dust correction), so two figures at most.
+            sheet.facts.append(.init(label: "Shines like", value: "≈ \(l.formatted(.number.precision(.significantDigits(2)))) Suns", detail: "in visible light"))
+        }
+        sheet.facts.append(.init(label: "From Earth", value: "Magnitude \(s.magnitude.formatted(.number.precision(.fractionLength(1))))"))
+        if let c = boundaries?.constellation(of: SkyCoordinates.cartesian(longitudeDeg: s.raDeg, latitudeDeg: s.decDeg, distance: 1)) {
+            sheet.facts.append(.init(label: "Constellation", value: Constellation.name(c)))
+        }
+        if s.measuredTemperatureK == nil, s.temperatureK != nil {
+            sheet.notes.append("Temperatures estimated from color run low for giant stars.")
+        }
+        return sheet
     }
 
     static func sun(_ d: SunDetails?) -> FactSheet {
         var sheet = FactSheet(title: "Sun", summary: "The star at the centre of the Solar System.", source: "NASA JPL Horizons.")
+        if var photo = CelestialPhotos.solarSystem["10"] {
+            photo.fallback = .toScale([.init(name: "Sun", radius: 1, look: .star(temperatureK: 5772))])
+            sheet.header = .photo(photo)
+        }
         guard let d else { return sheet }
         sheet.temperatureK = d.effectiveTemperatureK
         if let r = d.radiusKm { sheet.facts.append(.init(label: "Diameter", value: "\((r * 2).formatted(.number.precision(.fractionLength(0)))) km")) }
@@ -270,6 +433,13 @@ enum FactSheetBuilder {
     }
 
     // MARK: Formatting
+
+    /// A star beside the Sun at true relative size.
+    private static func withSun(name: String, radiusSuns: Double, temperatureK: Double?) -> [FactHeader.ScaleBody] {
+        [.init(name: name, radius: radiusSuns, look: .star(temperatureK: temperatureK)),
+         // 5,772 K is the IAU 2015 nominal solar effective temperature.
+         .init(name: "Sun", radius: 1, look: .star(temperatureK: 5772))]
+    }
 
     private static func colorFact(_ color: GalaxyColor, whose: String?) -> FactSheet.Fact {
         let source = color.isMeasured ? "measured" : "typical of \(color.typeName.map { $0 == "dwarfSpheroidal" ? "dwarf spheroidal" : $0 } ?? "its type")s"

@@ -80,9 +80,13 @@ final class CosmosViewModel: ObservableObject {
                 case .milkyWay:
                     async let systemsTask = repo.starSystems()
                     async let sunTask = try? repo.sun().effectiveTemperatureK
-                    let (systems, sun) = try await (systemsTask, sunTask)
+                    // The naked-eye stars are extra; the map still opens without them.
+                    async let nakedEyeTask = try? repo.nakedEyeStars()
+                    let (systems, sun, nakedEye) = try await (systemsTask, sunTask, nakedEyeTask)
                     sunTemperatureK = sun ?? sunTemperatureK
-                    setScene(await Task.detached { GraphBuilder.milkyWay(systems, sunTemperatureK: sun) }.value, for: place)
+                    setScene(await Task.detached {
+                        GraphBuilder.milkyWay(systems, nakedEye: nakedEye ?? [], sunTemperatureK: sun)
+                    }.value, for: place)
                 case .starSystem(let system):
                     exoplanets[system] = try await repo.planets(of: system)
                 case .solarSystem:
@@ -134,7 +138,7 @@ final class CosmosViewModel: ObservableObject {
         if let cached = visibilityCache[place] { return cached }
         let constellations = nodeConstellations[place]
         let visible = scene.nodes.indices.map { i in
-            scene.nodes[i].isHere || filter.allows(kind: scene.nodes[i].kind, constellation: constellations?[i] ?? nil)
+            scene.nodes[i].isHere || filter.allows(kinds: scene.nodes[i].kinds, constellation: constellations?[i] ?? nil)
         }
         visibilityCache[place] = visible
         return visible
@@ -147,9 +151,9 @@ final class CosmosViewModel: ObservableObject {
         }
         guard let scene = scenes[place] else { return [] }
         let constellations = nodeConstellations[place]
-        let kinds = scene.nodes.indices.compactMap { i -> ObjectKind? in
-            guard filter.constellation == nil || constellations?[i] == filter.constellation else { return nil }
-            return scene.nodes[i].kind
+        let kinds = scene.nodes.indices.flatMap { i -> [ObjectKind] in
+            guard filter.constellation == nil || constellations?[i] == filter.constellation else { return [] }
+            return scene.nodes[i].kinds
         }
         return ObjectKind.counts(kinds)
     }
@@ -159,7 +163,7 @@ final class CosmosViewModel: ObservableObject {
         guard let scene = scenes[place], let constellations = nodeConstellations[place] else { return [] }
         var counts: [String: Int] = [:]
         for (node, constellation) in zip(scene.nodes, constellations) {
-            guard let constellation, filter.kinds.isEmpty || node.kind.map(filter.kinds.contains) == true else { continue }
+            guard let constellation, filter.allows(kinds: node.kinds, constellation: nil) else { continue }
             counts[constellation, default: 0] += 1
         }
         return counts.map { ($0.key, $0.value) }.sorted { Constellation.name($0.0) < Constellation.name($1.0) }

@@ -34,8 +34,8 @@ struct GraphNode: Identifiable {
     var isHere = false
     /// Drawn fainter, e.g. groups whose membership in Laniakea is uncertain.
     var isMuted = false
-    /// What this node is, for filtering.
-    var kind: ObjectKind?
+    /// What this node is, for filtering: a type, and for stars which set it belongs to.
+    var kinds: [ObjectKind] = []
     /// Direction on the sky (equatorial J2000 unit vector), for finding its constellation.
     var direction: SIMD3<Double>?
     var facts: FactSubject?
@@ -53,6 +53,8 @@ struct GraphScene {
     let unit: Unit
     /// Optional filled region drawn behind everything (Laniakea's outline): cell centres and cell size.
     var region: (cells: [SIMD2<Double>], cellSize: Double)?
+    /// The region's edge as line segments, drawn as an orange outline.
+    var regionOutline: [(SIMD2<Double>, SIMD2<Double>)] = []
     /// Radius in layout units that the first view fits on screen, around `fitCenter`.
     let fitRadius: Double
     var fitCenter: SIMD2<Double> = .zero
@@ -84,7 +86,7 @@ enum GraphBuilder {
                 id: "group-\(g.id)", name: g.name, position: SIMD2(g.position.x, g.position.y),
                 size: log(Double(g.galaxyCount) + 1) / log(largest + 1),
                 subtitle: groupSubtitle(g), opens: .group(g), isMuted: g.isOnBoundary,
-                kind: g.isCluster ? .cluster : (g.galaxyCount > 1 ? .group : .loneGalaxy),
+                kinds: [g.isCluster ? .cluster : (g.galaxyCount > 1 ? .group : .loneGalaxy)],
                 direction: SkyCoordinates.equatorial(supergalactic: g.position), facts: .group(g),
                 temperatureK: colorTemperature(g.color)
             )
@@ -102,7 +104,8 @@ enum GraphBuilder {
         let fit = map.outlineCells.map { simd_distance($0, centre) }.max().map { $0 + map.cellSizeMpc / 2 } ?? 150
         return GraphScene(
             nodes: nodes, links: nearestNeighbors(points, k: 2, within: 12), unit: .megaparsecs,
-            region: (map.outlineCells, map.cellSizeMpc), fitRadius: fit, fitCenter: centre,
+            region: (map.outlineCells, map.cellSizeMpc), regionOutline: outline(cells: map.outlineCells, size: map.cellSizeMpc),
+            fitRadius: fit, fitCenter: centre,
             caption: "\(map.groups.filter { !$0.isOnBoundary }.count.formatted()) galaxy groups inside, faint ones on the edge. "
                 + "Shading is Laniakea; empty parts haven't had galaxy distances measured, mostly behind the Milky Way's disc."
         )
@@ -145,7 +148,7 @@ enum GraphBuilder {
             return GraphNode(
                 id: "galaxy-\(g.id)", name: g.name, position: position, size: g.id == group.id ? 1 : 0.45,
                 subtitle: "\(g.morphology.map { "\($0) · " } ?? "")\(distanceNumber(g.distanceMpc))\(error) Mpc away", opens: nil,
-                kind: ObjectKind.galaxy(morphology: g.morphology),
+                kinds: [ObjectKind.galaxy(morphology: g.morphology)],
                 direction: SkyCoordinates.equatorial(supergalactic: g.position), facts: .galaxy(g, groupName: group.name),
                 temperatureK: colorTemperature(g.color)
             )
@@ -174,34 +177,87 @@ enum GraphBuilder {
         )
     }
 
-    /// Stars with planets, seen from above the Milky Way's disc, with the Sun at the centre.
-    static func milkyWay(_ systems: [StarSystem], sunTemperatureK: Double? = nil) -> GraphScene {
+    /// Stars with planets and the stars you can see with your eyes, seen from above the Milky Way's
+    /// disc, with the Sun at the centre. A naked-eye star with planets appears once, under its own name.
+    static func milkyWay(_ systems: [StarSystem], nakedEye: [NakedEyeStar] = [], sunTemperatureK: Double? = nil) -> GraphScene {
         let most = Double(systems.map(\.planetCount).max() ?? 1)
+        var brightByHD: [Int: NakedEyeStar] = [:]
+        for star in nakedEye { if let hd = star.hd { brightByHD[hd] = star } }
         var nodes = systems.map { s in
-            GraphNode(
-                id: "star-\(s.id)", name: s.name, position: SIMD2(s.position.x, s.position.y),
+            let bright = s.hd.flatMap { brightByHD[$0] }
+            let planets = s.planetCount == 1 ? "1 planet" : "\(s.planetCount) planets"
+            return GraphNode(
+                id: "star-\(s.id)", name: bright?.properName ?? s.name, position: SIMD2(s.position.x, s.position.y),
                 size: 0.15 + 0.85 * Double(s.planetCount - 1) / max(most - 1, 1),
-                subtitle: "\(s.planetCount == 1 ? "1 planet" : "\(s.planetCount) planets") · \(lightYearsText(parsecs: s.distanceParsecs))",
+                subtitle: "\(bright?.properName != nil ? "\(s.name) · " : "")\(planets) · \(lightYearsText(parsecs: s.distanceParsecs))",
                 opens: .starSystem(s),
-                kind: ObjectKind.star(spectralType: s.spectralType, temperatureK: s.temperatureK),
+                kinds: [ObjectKind.star(spectralType: s.spectralType, temperatureK: s.temperatureK), .withPlanets] + (bright != nil ? [.nakedEye] : []),
                 direction: SkyCoordinates.equatorial(galactic: s.position), facts: .starSystem(s),
                 temperatureK: s.temperatureK
             )
+        }
+        let hostHDs = Set(systems.compactMap(\.hd))
+        let visible = nakedEye.filter { star in star.position != nil && !(star.hd.map(hostHDs.contains) ?? false) }
+        for star in visible {
+            guard let p = star.position else { continue }
+            nodes.append(GraphNode(
+                id: "naked-\(star.id)", name: star.name, position: SIMD2(p.x, p.y),
+                // Brighter stars draw bigger: magnitude −1.5 (Sirius) to 6 (the faintest you can see).
+                size: max(0.05, min(1, (6 - star.magnitude) / 7.5)) * 0.8,
+                subtitle: "\(star.designation.map { star.properName != nil ? "\($0) · " : "" } ?? "")Naked-eye star · \(lightYearsText(parsecs: star.distanceParsecs ?? 0))",
+                opens: nil,
+                kinds: [ObjectKind.star(spectralType: star.spectralType, temperatureK: star.temperatureK), .nakedEye],
+                direction: SkyCoordinates.cartesian(longitudeDeg: star.raDeg, latitudeDeg: star.decDeg, distance: 1),
+                facts: .nakedEyeStar(star), temperatureK: star.temperatureK
+            ))
         }
         nodes.append(GraphNode(
             id: "sun", name: "Sun", position: .zero, size: 0.6,
             subtitle: "Solar System · You are here", opens: .solarSystem, isHere: true, facts: .sun,
             temperatureK: sunTemperatureK
         ))
-        var points = systems.map(\.position)
+        var points = systems.map(\.position) + visible.compactMap(\.position)
         points.append(.zero)
         // Fit most systems; a few microlensing finds sit thousands of parsecs away.
         let distances = systems.map(\.distanceParsecs).sorted()
         let fit = distances.isEmpty ? 100 : distances[Int(Double(distances.count - 1) * 0.6)]
         return GraphScene(
             nodes: nodes, links: nearestNeighbors(points, k: 2, within: 40), unit: .parsecs, region: nil,
-            fitRadius: fit, caption: "\(systems.count.formatted()) stars with confirmed planets"
+            fitRadius: fit,
+            caption: "\(systems.count.formatted()) stars with confirmed planets and \(visible.count.formatted()) more you can see with your eyes"
         )
+    }
+
+    /// The edge of a region of grid cells (given by their centres) as segments, by marching squares:
+    /// corners of each square are cell centres, and the edge cuts across a square diagonally where
+    /// one corner is in and its neighbours are out, so it isn't drawn as stair steps.
+    static func outline(cells: [SIMD2<Double>], size: Double) -> [(SIMD2<Double>, SIMD2<Double>)] {
+        let keys = Set(cells.map { SIMD2(Int(floor($0.x / size)), Int(floor($0.y / size))) })
+        guard let minX = keys.map(\.x).min(), let maxX = keys.map(\.x).max(),
+              let minY = keys.map(\.y).min(), let maxY = keys.map(\.y).max()
+        else { return [] }
+        func on(_ i: Int, _ j: Int) -> Bool { keys.contains(SIMD2(i, j)) }
+        func point(_ i: Double, _ j: Double) -> SIMD2<Double> { SIMD2((i + 0.5) * size, (j + 0.5) * size) }
+        var segments: [(SIMD2<Double>, SIMD2<Double>)] = []
+        for i in (minX - 1)...maxX {
+            for j in (minY - 1)...maxY {
+                let (x, y) = (Double(i), Double(j))
+                let bottom = point(x + 0.5, y), right = point(x + 1, y + 0.5), top = point(x + 0.5, y + 1), left = point(x, y + 0.5)
+                let code = (on(i, j) ? 1 : 0) | (on(i + 1, j) ? 2 : 0) | (on(i + 1, j + 1) ? 4 : 0) | (on(i, j + 1) ? 8 : 0)
+                switch code {
+                case 1, 14: segments.append((left, bottom))
+                case 2, 13: segments.append((bottom, right))
+                case 3, 12: segments.append((left, right))
+                case 4, 11: segments.append((right, top))
+                case 6, 9: segments.append((bottom, top))
+                case 7, 8: segments.append((left, top))
+                case 5: segments += [(left, top), (bottom, right)]
+                case 10: segments += [(left, bottom), (right, top)]
+                default: break
+                }
+            }
+        }
+        return segments
     }
 
     /// Links each point to its `k` nearest neighbours closer than `within`, using a spatial hash.

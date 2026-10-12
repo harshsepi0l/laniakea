@@ -5,6 +5,8 @@ protocol CosmicRepo {
     func galaxies(in group: GalaxyGroup) async throws -> [Galaxy]
     /// Stars in the Milky Way with confirmed planets.
     func starSystems() async throws -> [StarSystem]
+    /// Stars bright enough to see with the eye, with distances, sizes and names where known.
+    func nakedEyeStars() async throws -> [NakedEyeStar]
     func planets(of system: StarSystem) async throws -> [Exoplanet]
 
     // Fact sheets

@@ -155,6 +155,9 @@ struct GalaxyDetails: Codable {
     let morphology: String?
     /// Apparent size along the long axis, in arcminutes.
     let majorAxisArcmin: Double?
+    var minorAxisArcmin: Double?
+    /// Direction of the long axis on the sky, degrees from north toward east.
+    var positionAngleDeg: Double?
     /// Velocity along our line of sight, as seen from the Sun, km/s; positive is away.
     let velocityKmS: Double?
     let methods: [DistanceMethod]
@@ -192,6 +195,67 @@ struct SunDetails: Codable {
     let speedCosmicBackgroundKmS: Double?
 }
 
+/// A star bright enough to see with the eye (magnitude 6 or brighter), from the Yale Bright Star
+/// Catalogue, with its Hipparcos distance, measured size (JSDC) and measured temperature (PASTEL)
+/// where they exist.
+struct NakedEyeStar: Codable, Identifiable, Hashable {
+    /// Bright Star Catalogue (HR) number.
+    let id: Int
+    /// The IAU's official name, such as "Pollux".
+    let properName: String?
+    /// Traditional designation, such as "β Geminorum".
+    let designation: String?
+    let hd: Int?
+    let raDeg: Double
+    let decDeg: Double
+    let magnitude: Double
+    let bMinusV: Double?
+    let spectralType: String?
+    /// Hipparcos new reduction (van Leeuwen 2007), in milliarcseconds.
+    let parallaxMas: Double?
+    let parallaxErrorMas: Double?
+    /// Limb-darkened angular diameter from the JMMC Stellar Diameters Catalogue, in milliarcseconds.
+    let angularDiameterMas: Double?
+    /// Median of published measurements (PASTEL); nil when none exist.
+    let measuredTemperatureK: Double?
+
+    var name: String { properName ?? designation ?? "HR \(id)" }
+
+    /// Distance from a parallax measured to better than 20%; nil otherwise.
+    var distanceParsecs: Double? {
+        guard let p = parallaxMas, let e = parallaxErrorMas, p > 0, e < 0.2 * p else { return nil }
+        return 1000 / p
+    }
+
+    var distanceErrorParsecs: Double? {
+        guard let d = distanceParsecs, let p = parallaxMas, let e = parallaxErrorMas else { return nil }
+        return d * e / p
+    }
+
+    /// Measured, else estimated from its color (Ballesteros 2012), which runs low for giants.
+    var temperatureK: Double? { measuredTemperatureK ?? bMinusV.map { StarColor.temperature(bv: $0) } }
+
+    /// Radius in solar radii: half the angular diameter times the distance (1 AU = 215.03 R☉).
+    var radiusSuns: Double? {
+        guard let theta = angularDiameterMas, let d = distanceParsecs else { return nil }
+        return theta / 2 / 1000 * d * 215.03
+    }
+
+    /// Luminosity in visible (V-band) light relative to the Sun (M_V = 4.83), ignoring dust.
+    var visualLuminositySuns: Double? {
+        guard let d = distanceParsecs else { return nil }
+        let absolute = magnitude - 5 * log10(d / 10)
+        return pow(10, -0.4 * (absolute - 4.83))
+    }
+
+    /// Galactic Cartesian position in parsecs, like `StarSystem.position`.
+    var position: SIMD3<Double>? {
+        guard let d = distanceParsecs else { return nil }
+        let g = SkyCoordinates.galactic(raDeg: raDeg, decDeg: decDeg)
+        return SkyCoordinates.cartesian(longitudeDeg: g.l, latitudeDeg: g.b, distance: d)
+    }
+}
+
 /// A star with at least one confirmed planet, from the NASA Exoplanet Archive.
 struct StarSystem: Codable, Identifiable, Hashable {
     let id: String
@@ -201,6 +265,8 @@ struct StarSystem: Codable, Identifiable, Hashable {
     let planetCount: Int
     let spectralType: String?
     let temperatureK: Double?
+    /// HD catalog number, which links it to the naked-eye stars.
+    var hd: Int?
     /// Galactic Cartesian position in parsecs, x toward the Galactic Centre, z toward Galactic north.
     let position: SIMD3<Double>
 }
