@@ -8,6 +8,7 @@ import simd
 /// |---|---|
 /// | Laniakea's boundary | Cosmicflows basins of attraction (Dupuy & Courtois 2023) |
 /// | Galaxy groups and galaxies | Cosmicflows-4 (Tully et al. 2023) via VizieR |
+/// | The Local Group | Local Volume Database (Pace 2025); types from McConnachie (2012) via VizieR |
 /// | Names, Hubble types | SIMBAD |
 /// | Galaxy colors | RC3 (de Vaucouleurs et al. 1991) via VizieR |
 /// | Stars with planets, and their planets | NASA Exoplanet Archive; Gaia DR3 and SIMBAD parallaxes where it has no distance |
@@ -21,7 +22,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     private let boundary = LaniakeaBoundarySource()
     private let flowSource = CosmicFlowSource()
 
-    private static let catalogAge: TimeInterval = 180 * 86400
+    static let catalogAge: TimeInterval = 180 * 86400
     private static let exoplanetAge: TimeInterval = 7 * 86400
 
     // MARK: Solar System
@@ -43,7 +44,7 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     }
 
     func laniakea() async throws -> LaniakeaMap {
-        try await cached(DiskCache<LaniakeaMap>(name: "laniakea-map-v7"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<LaniakeaMap>(name: "laniakea-map-v8"), maxAge: Self.catalogAge) {
             async let gridTask = self.boundary.loadGrid()
             async let colorsTask = self.galaxyColors()
             async let rowsTask = TAPClient.vizier.query("""
@@ -57,7 +58,15 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
                 AVG(COS(RADIANS(SGB))*SIN(RADIANS(SGL))) AS uy, AVG(SIN(RADIANS(SGB))) AS uz \
                 FROM "J/ApJ/944/94/table2" GROUP BY "1PGC"
                 """)
-            let (grid, rows, directionRows, colors) = try await (gridTask, rowsTask, directionsTask, colorsTask)
+            // A few galaxies' group (1PGC) has no row in the group table, among them the Magellanic
+            // Clouds; each such set becomes a group of its own at its members' mean distance modulus.
+            async let orphansTask = TAPClient.vizier.query("""
+                SELECT t."1PGC", COUNT(*) AS n, AVG(t.DM) AS dm FROM "J/ApJ/944/94/table2" AS t \
+                WHERE t."1PGC" NOT IN (SELECT g."1PGC" FROM "J/ApJ/944/94/groups" AS g) GROUP BY t."1PGC"
+                """)
+            let (grid, groupRows, directionRows, colors) = try await (gridTask, rowsTask, directionsTask, colorsTask)
+            let orphans = (try? await orphansTask) ?? []
+            let rows = groupRows + orphans.map { ["1PGC": $0["1PGC"] ?? "", "Ngal": $0["n"] ?? "", "DMzp": $0["dm"] ?? ""] }
             var directions: [Int: SIMD3<Double>] = [:]
             for row in directionRows {
                 guard let id = row.int("1PGC"), let x = row.double("ux"), let y = row.double("uy"), let z = row.double("uz"),
@@ -91,9 +100,11 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
             let groups = inside.map { c -> GalaxyGroup in
                 let galaxy = galaxyNames[c.id] ?? "PGC \(c.id)"
                 let named = clusterNames[c.id]
-                // Cosmicflows-4's entry here is only Andromeda's half of the Local Group; the Milky
-                // Way's half isn't listed. So it's named for Andromeda, not the whole Local Group.
-                let name = c.id == GalaxyGroup.localGroupID ? "Andromeda group" : named?.name ?? (c.count > 1 ? "\(galaxy) group" : galaxy)
+                // Cosmicflows-4 splits the Local Group into Andromeda's group and the Milky Way's
+                // (whose leader has no name in SIMBAD). The map folds both into the Local Group.
+                let name = c.id == GalaxyGroup.andromedaGroupID ? "Andromeda group"
+                    : c.id == GalaxyGroup.milkyWayGroupID ? "Milky Way group"
+                    : named?.name ?? (c.count > 1 ? "\(galaxy) group" : galaxy)
                 return GalaxyGroup(id: c.id, name: name, galaxyCount: c.count, distanceMpc: c.distance,
                                    position: c.position, isOnBoundary: c.edge, isCluster: named?.isCluster ?? false,
                                    color: colors.color(pgc: c.id, morphology: leaderTypes[c.id]),
@@ -135,12 +146,13 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
     }
 
     func details(of group: GalaxyGroup) async throws -> GroupDetails {
-        try await cached(DiskCache<GroupDetails>(name: "cf4-group-details-v3-\(group.id)"), maxAge: Self.catalogAge) {
+        try await cached(DiskCache<GroupDetails>(name: "cf4-group-details-v4-\(group.id)"), maxAge: Self.catalogAge) {
             let rows = try await TAPClient.vizier.query("""
                 SELECT e_DMzp, fV3k, Vh, Vpec, o_DMcal, o_DMsnIa, o_DMfp, o_DMtf, o_DMsbfo, o_DMsbfi, DMsnII \
                 FROM "J/ApJ/944/94/groups" WHERE "1PGC" = \(group.id)
                 """)
-            guard let row = rows.first else { throw CatalogError.unreadable("This group's Cosmicflows-4 entry") }
+            // Groups without a row of their own are described from their galaxies.
+            guard let row = rows.first else { return try await self.memberDetails(of: group) }
             // The catalog counts galaxies per method, except for type II supernovae.
             var methods: [GroupDetails.MethodCount] = []
             let counted: [(DistanceMethod, Int?)] = [
@@ -669,13 +681,13 @@ final class CosmicCatalog: CosmicRepo, PlanetRepo {
 
     /// Every group, host star and planet list has at least one entry, so an empty result means the
     /// query went wrong; throwing keeps it out of the cache.
-    private static func nonEmpty<T>(_ what: String, _ items: [T]) throws -> [T] {
+    static func nonEmpty<T>(_ what: String, _ items: [T]) throws -> [T] {
         guard !items.isEmpty else { throw CatalogError.unreadable(what) }
         return items
     }
 
     /// A fresh cached value, else a new fetch (saved), else a stale cached value.
-    private func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
+    func cached<T: Codable>(_ cache: DiskCache<T>, maxAge: TimeInterval, fetch: () async throws -> T) async throws -> T {
         if let fresh = cache.load(maxAge: maxAge) { return fresh }
         do {
             let value = try await fetch()

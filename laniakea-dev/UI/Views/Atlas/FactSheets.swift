@@ -36,6 +36,7 @@ struct FactSheetData {
     var starDetails: StarDetails?
     var sun: SunDetails?
     var galaxyColors: GalaxyColors?
+    var localGroup: LocalGroup?
     /// The naked-eye star a planet host is, if it's one, for its proper name.
     var brightStar: NakedEyeStar?
     var constellation: ConstellationProfile?
@@ -50,6 +51,8 @@ enum FactSheetBuilder {
         case .laniakea: return laniakea(data.map)
         case .group(let g): return group(g, data.groupDetails, data.boundaries)
         case .galaxy(let g, let groupName): return galaxy(g, groupName: groupName, data.galaxyDetails, data.boundaries)
+        case .localGroup: return localGroup(data.localGroup)
+        case .localGroupGalaxy(let g): return localGroupGalaxy(g, data.localGroup, data.boundaries)
         case .milkyWay: return milkyWay(data.systems, sun: data.sun, colors: data.galaxyColors)
         case .starSystem(let s): return star(s, data.starDetails, data.boundaries, brightStar: data.brightStar)
         case .nakedEyeStar(let s): return nakedEyeStar(s, data.boundaries)
@@ -91,25 +94,21 @@ enum FactSheetBuilder {
     // MARK: Groups and galaxies
 
     static func group(_ g: GalaxyGroup, _ details: GroupDetails?, _ boundaries: ConstellationBoundaries?) -> FactSheet {
-        // Andromeda's group is the Local Group's other half, so it's described as part of our home.
-        let isHome = g.id == GalaxyGroup.localGroupID
         let what = g.isCluster ? "A galaxy cluster" : (g.galaxyCount > 1 ? "A group of galaxies" : "A galaxy with no measured neighbours")
         let place = g.isOnBoundary ? "on Laniakea's edge" : "in Laniakea"
         var sheet = FactSheet(
             title: g.name,
-            summary: isHome
-                ? "Andromeda, the Triangulum Galaxy and their satellites: one half of the Local Group. The Milky Way and its own satellites are the other half. Cosmicflows-4 lists only Andromeda's side, as it has no entry for our galaxy."
-                : "\(what) \(place), \(GraphBuilder.lightYearsText(parsecs: g.distanceMpc * 1e6)) away.",
+            summary: "\(what) \(place), \(GraphBuilder.lightYearsText(parsecs: g.distanceMpc * 1e6)) away.",
             source: "Cosmicflows-4 (Tully et al. 2023). Names: SIMBAD. Color: RC3."
         )
         sheet.facts = [
-            .init(label: "Galaxies with distances", value: g.galaxyCount.formatted(), detail: isHome ? "on Andromeda's side" : nil),
+            .init(label: "Galaxies with distances", value: g.galaxyCount.formatted()),
             .init(label: "Distance", value: mpc(g.distanceMpc, error: details?.distanceErrorMpc),
                   detail: GraphBuilder.lightYearsText(parsecs: g.distanceMpc * 1e6)),
         ]
         if let v = details?.velocityKmS { sheet.facts.append(lineOfSight(v)) }
         // Measured against the cosmic background; for nearby groups that is mostly our own motion.
-        if !isHome, g.distanceMpc >= 30, let v = details?.peculiarVelocityKmS {
+        if g.distanceMpc >= 30, let v = details?.peculiarVelocityKmS {
             let error = details?.peculiarVelocityErrorKmS.map { " ± \($0.formatted(.number.precision(.fractionLength(0))))" } ?? ""
             sheet.facts.append(.init(
                 label: "Peculiar velocity", value: "\(v >= 0 ? "+" : "−")\(abs(v).formatted(.number.precision(.fractionLength(0))))\(error) km/s",
@@ -117,14 +116,12 @@ enum FactSheetBuilder {
             ))
         }
         sheet.facts.append(.init(label: "In Laniakea", value: g.isOnBoundary ? "On the edge" : "Inside"))
-        if !isHome {
-            // About 1 Mpc of space around the group's centre: wide for Virgo, narrow far away.
-            let sky = SkyCoordinates.spherical(SkyCoordinates.equatorial(supergalactic: g.position))
-            let fov = min(max(1 / g.distanceMpc * 180 / .pi, 0.2), 4)
-            var photo = CelestialPhotos.sky(raDeg: sky.l, decDeg: sky.b, fovDegrees: fov)
-            photo.caption = "\(photo.caption ?? ""), about 3 million light-years at its distance"
-            sheet.header = .photo(photo)
-        }
+        // About 1 Mpc of space around the group's centre: wide for Virgo, narrow far away.
+        let sky = SkyCoordinates.spherical(SkyCoordinates.equatorial(supergalactic: g.position))
+        let fov = min(max(1 / g.distanceMpc * 180 / .pi, 0.2), 4)
+        var photo = CelestialPhotos.sky(raDeg: sky.l, decDeg: sky.b, fovDegrees: fov)
+        photo.caption = "\(photo.caption ?? ""), about 3 million light-years at its distance"
+        sheet.header = .photo(photo)
         if let color = g.color {
             sheet.facts.append(colorFact(color, whose: "its brightest galaxy"))
             sheet.temperatureK = GraphBuilder.colorTemperature(color)
@@ -448,12 +445,12 @@ enum FactSheetBuilder {
     }
 
     /// Andromeda is coming toward us at 300 km/s; Virgo's galaxies move away at over 1,000.
-    private static func lineOfSight(_ v: Double) -> FactSheet.Fact {
+    static func lineOfSight(_ v: Double) -> FactSheet.Fact {
         .init(label: v < 0 ? "Coming toward us at" : "Moving away at",
               value: "\(abs(v).formatted(.number.precision(.fractionLength(0)))) km/s", detail: "as seen from the Sun")
     }
 
-    private static func constellation(_ direction: SIMD3<Double>, _ boundaries: ConstellationBoundaries?) -> String? {
+    static func constellation(_ direction: SIMD3<Double>, _ boundaries: ConstellationBoundaries?) -> String? {
         boundaries?.constellation(of: direction).map(Constellation.name)
     }
 
@@ -469,7 +466,7 @@ enum FactSheetBuilder {
         value >= 1e6 ? "\((value / 1e6).formatted(.number.precision(.significantDigits(2)))) million" : value.formatted(.number.precision(.significantDigits(2)))
     }
 
-    private static func times(_ value: Double) -> String {
+    static func times(_ value: Double) -> String {
         value.formatted(.number.precision(.significantDigits(value < 10 ? 2 : 3)))
     }
 

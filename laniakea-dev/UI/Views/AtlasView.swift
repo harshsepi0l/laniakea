@@ -308,6 +308,7 @@ struct AtlasView: View {
     private func loadingMessage(_ place: AtlasPlace) -> String {
         switch place {
         case .laniakea: return "Mapping Laniakea from Cosmicflows-4. The first time, this downloads about 17 MB."
+        case .localGroup: return "Loading the Local Group from the Local Volume Database…"
         case .milkyWay: return "Loading stars with planets from the NASA Exoplanet Archive…"
         default: return "Loading \(place.title)…"
         }

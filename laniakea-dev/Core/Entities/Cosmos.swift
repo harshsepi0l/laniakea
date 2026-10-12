@@ -4,10 +4,16 @@ import simd
 /// A group or cluster of galaxies from Cosmicflows-4 (Tully et al. 2023), identified by the PGC
 /// number of its brightest galaxy.
 struct GalaxyGroup: Codable, Identifiable, Hashable {
-    /// Andromeda's group (PGC 2557): Andromeda, Triangulum and their satellites, the Local Group's
-    /// other half. Cosmicflows-4 has no entry for the Milky Way or its satellites, so this is the
-    /// only part of our own Local Group it lists.
-    static let localGroupID = 2557
+    /// Andromeda's group (PGC 2557): Andromeda, Triangulum and the satellites Cosmicflows-4 measured,
+    /// the Local Group's other half.
+    static let andromedaGroupID = 2557
+    /// The Milky Way's group. Its leader, PGC 5064336, is the Milky Way itself: Kourkchi & Tully (2017,
+    /// J/ApJ/843/16) list that number as "Milky Way" at Sagittarius A*, the group's sky position, at
+    /// the head of a group with the Magellanic Clouds and the classical dwarfs. In Cosmicflows-4 it has
+    /// only two galaxies with distances, Leo I and Leo II (about 250 kpc), and a group distance of
+    /// about 120 kpc that matches neither, so the Local Group is drawn from the Local Volume
+    /// Database instead (`LocalGroup`).
+    static let milkyWayGroupID = 5064336
 
     let id: Int
     let name: String

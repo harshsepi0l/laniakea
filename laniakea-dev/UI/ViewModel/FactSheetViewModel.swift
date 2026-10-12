@@ -35,6 +35,8 @@ final class FactSheetViewModel: ObservableObject {
                 data.groupDetails = try await repo.details(of: g)
             case .galaxy(let g, _):
                 data.galaxyDetails = try await repo.details(of: g)
+            case .localGroup, .localGroupGalaxy:
+                data.localGroup = try await repo.localGroup()
             case .milkyWay:
                 async let systems = repo.starSystems()
                 async let sun = repo.sun()
