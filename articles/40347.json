@@ -1,0 +1,32 @@
+{
+  "id": 40347,
+  "title": "Five Moons in One Picture: Jupiter and Luna",
+  "summary": "A photo taken from New York captured Earth's Moon passing in front of Jupiter, with four of Jupiter's moons lined up above it. It shows five moons in one frame and offers a size comparison between Earth's Moon and Jupiter's largest satellites.",
+  "sections": [
+    {
+      "heading": "A Five-Moon Photograph",
+      "body": "How many moons can you spot in this image? The answer is five: four circle Jupiter, and one is our own Moon, called Luna. The picture was possible because Earth's Moon moved directly in front of Jupiter last week."
+    },
+    {
+      "heading": "How the Image Was Made",
+      "body": "The featured image is a series of exposures taken near the moment of alignment from Westchester, New York, USA. The sunlit crescent of Earth's Moon at lower left is overexposed, meaning it appears washed out because of its brightness. The Moon's night side at upper right glows faintly from Earthshine, which is sunlight reflected off Earth."
+    },
+    {
+      "heading": "Jupiter's Galilean Moons",
+      "body": "Lined up nearly vertically above our Moon are Jupiter's bright Galilean satellites. From bottom to top they are Ganymede, Io, Callisto, and Europa. Ganymede, Io, and Callisto are all larger than Earth's Moon, while Europa is only slightly smaller."
+    },
+    {
+      "heading": "Juno at Jupiter",
+      "body": "NASA's robotic spacecraft Juno is currently orbiting Jupiter. It has made close passes near three of these moons."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-12-jupiter-and-the-moons/",
+    "original_title": "APOD: 2026 October 12 – Jupiter and the Moons"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/JupiterMoons_Upreti_3105.jpg",
+  "published_at": "2026-10-12T04:05:00Z",
+  "generated_at": "2026-10-12T05:22:19+00:00",
+  "model": "claude-sonnet-5-5"
+}

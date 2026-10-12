@@ -1,0 +1,32 @@
+{
+  "id": 40346,
+  "title": "Antarctic Sea Ice Reaches Its 2026 Maximum, Third Lowest on Record",
+  "summary": "NASA and the National Snow and Ice Data Center say Antarctic sea ice likely peaked on September 14, 2026, at the third-lowest maximum on record. The result fits a pattern of lower-than-normal ice since 2016, though scientists are still working out whether it is a lasting change.",
+  "sections": [
+    {
+      "heading": "This Year's Winter Peak",
+      "body": "Antarctic sea ice usually peaks around September, at the end of the Southern Hemisphere's winter, and shrinks to a minimum in February. NASA and the National Snow and Ice Data Center (NSIDC) say the 2026 maximum most likely came on September 14. The ice covered an estimated 17.59 million square kilometers (6.79 million square miles), the third-lowest maximum on record."
+    },
+    {
+      "heading": "Why Antarctica Behaves Differently",
+      "body": "The Arctic is an ocean basin ringed by land, while Antarctica is a large continent surrounded by ocean. That geography gives sea ice more room to spread in winter. But the ice also reaches into warmer latitudes, so more of it melts in summer."
+    },
+    {
+      "heading": "From Record Highs to Lows",
+      "body": "From 1979 to 2014, total Antarctic sea ice grew by about 1 percent per decade, though it varies so much from year to year that the meaning of that growth is uncertain. Satellites saw record winter highs from 2012 to 2014, and the climb ended in 2015. Significant decreases began in 2016, and the ice has largely stayed below normal since, with both the record low minimum and record low maximum occurring in 2023. Scientists will keep watching to learn whether the decline is a long-term change or a statistical fluctuation."
+    },
+    {
+      "heading": "Seeing Through the Clouds",
+      "body": "Scientists measure sea ice extent, the total area where at least 15 percent of the surface is ice-covered, using satellites with passive microwave sensors. These sensors detect microwave energy that Earth naturally emits, and sea ice gives off more of it than open water does. Microwaves pass through clouds, so the satellites can track the ice in any weather. The record began in late 1978 with NASA's Nimbus-7 and has drawn on several other satellites since, with Japan's GCOM-W added in 2025."
+    }
+  ],
+  "source": {
+    "name": "NASA",
+    "url": "https://science.nasa.gov/earth/earth-observatory/antarctic-sea-ice-grows-to-its-2026-maximum/",
+    "original_title": "Antarctic Sea Ice Grows to Its 2026 Maximum"
+  },
+  "image_url": "https://assets.science.nasa.gov/dynamicimage/assets/science/esd/eo/images/iotd/2026/antarctic-sea-ice-grows-to-its-2026-maximum/antarctic_nsidc_20260914.jpg",
+  "published_at": "2026-10-12T04:00:00Z",
+  "generated_at": "2026-10-12T05:22:25+00:00",
+  "model": "claude-sonnet-5-5"
+}
