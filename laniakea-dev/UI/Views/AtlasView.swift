@@ -29,6 +29,10 @@ struct AtlasView: View {
     @State private var showFilters = false
     @State private var showList = false
     @State private var solar3D = false
+    /// The star and galaxy maps' 3D view; it stays on as you move between places.
+    @State private var graph3D = false
+    /// Set in Settings; off by default. Off, everything stays where it is today and no time controls show.
+    @AppStorage("atlas.simulations") private var simulationsOn = false
 
     var body: some View {
         NavigationStack {
@@ -66,8 +70,15 @@ struct AtlasView: View {
         .onChange(of: cosmos.current) { _, _ in
             showList = false
             closeSearch()
+            cosmos.deepClock.reset(for: cosmos.scenes[cosmos.current]?.motion)
         }
+        // A place's scene can arrive after you get there.
+        .onChange(of: cosmos.scenes[cosmos.current] != nil) { _, loaded in
+            if loaded { cosmos.deepClock.reset(for: cosmos.scenes[cosmos.current]?.motion) }
+        }
+        .onChange(of: simulationsOn) { _, _ in applySimulationSetting() }
         .onAppear {
+            applySimulationSetting()
             solarSystemVM.load()
             cosmos.load(cosmos.current)
             cosmos.loadConstellations()
@@ -98,8 +109,13 @@ struct AtlasView: View {
                 .accessibilityHint("Point your device at the sky to find stars and planets")
             RoundButton(systemImage: "line.3.horizontal.decrease", label: "Filter", badge: filterCount) { showFilters = true }
             RoundButton(systemImage: "list.bullet", label: listLabel) { showList = true }
-            if cosmos.current == .solarSystem {
+            switch cosmos.current {
+            case .solarSystem:
                 RoundButton(text: solar3D ? "2D" : "3D", label: solar3D ? "Switch to flat view" : "Switch to 3D view") { solar3D.toggle() }
+            case .starSystem:
+                EmptyView()
+            default:
+                RoundButton(text: graph3D ? "2D" : "3D", label: graph3D ? "Switch to flat view" : "Switch to 3D view") { graph3D.toggle() }
             }
         }
     }
@@ -127,7 +143,11 @@ struct AtlasView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
                 HStack(alignment: .bottom, spacing: 8) {
-                    if let clock = timeClock { TimeControls(clock: clock) }
+                    if let clock = timeClock {
+                        TimeControls(clock: clock)
+                    } else if simulationsOn, let motion = cosmos.scenes[cosmos.current]?.motion {
+                        DeepTimeControls(clock: cosmos.deepClock, motion: motion)
+                    }
                     Spacer(minLength: 0)
                     if canSearch {
                         RoundButton(systemImage: "magnifyingglass", label: "Search \(cosmos.current.title)") {
@@ -141,13 +161,24 @@ struct AtlasView: View {
         .padding(.bottom, AtlasChrome.bottomGap)
     }
 
-    /// The clock that runs the current place, if it moves.
+    /// The clock that runs the current place, if it has orbits and simulations are on.
     private var timeClock: SimulationClock? {
+        guard simulationsOn else { return nil }
         switch cosmos.current {
         case .solarSystem: return solarSystemVM.planets.isEmpty ? nil : solarSystemVM.clock
         case .starSystem(let system): return cosmos.exoplanets[system] == nil ? nil : cosmos.exoplanetClock
         default: return nil
         }
+    }
+
+    /// With simulations off, the planets stay where they are today.
+    private func applySimulationSetting() {
+        guard !simulationsOn else { return }
+        for clock in [solarSystemVM.clock, cosmos.exoplanetClock] {
+            clock.isPlaying = false
+            clock.reset()
+        }
+        cosmos.deepClock.reset()
     }
 
     private var canSearch: Bool {
@@ -193,8 +224,11 @@ struct AtlasView: View {
                 CosmicGraphView(
                     scene: scene, focusID: $focusID, visible: cosmos.visibility(for: cosmos.current),
                     onOpen: { cosmos.open($0) }, onFacts: { factSubject = $0 }, showObjects: $showList,
+                    is3D: $graph3D, clock: cosmos.deepClock, runsTime: simulationsOn,
                     // The scale and caption sit beside the search button, and move up over the open field.
                     bottomInset: AtlasChrome.bottomGap + (isSearching ? AtlasChrome.searchFieldHeight : 0)
+                        // Above the time control when it shows.
+                        + (simulationsOn && scene.motion != nil && !isSearching ? AtlasChrome.searchFieldHeight : 0)
                 )
                 .id(cosmos.current)
             } else {
@@ -480,6 +514,70 @@ struct RoundButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(badge > 0 ? "\(label), \(badge) on" : label)
+    }
+}
+
+/// Time in years for the star and galaxy maps: play and pause, how far from now, speed and
+/// direction, and a jump back to now. The menu says what the motion is based on.
+struct DeepTimeControls: View {
+    @ObservedObject var clock: DeepTimeClock
+    let motion: GraphScene.Motion
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button { clock.isPlaying.toggle() } label: {
+                Image(systemName: clock.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .background(Color.primary.opacity(0.08), in: Circle())
+            }
+            .accessibilityLabel(clock.isPlaying ? "Pause" : "Play")
+            TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(DeepTimeClock.label(years: clock.years))
+                        .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                    // Past where straight-line motion stays right; the caption says why.
+                    if motion.isPrediction(clock.years) {
+                        Text("Predicted")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.orange)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            Menu {
+                Section(motion.model) {
+                    Picker("Speed", selection: $clock.speedIndex) {
+                        ForEach(motion.speeds.indices, id: \.self) { i in
+                            Text(motion.speeds[i].label).tag(i)
+                        }
+                    }
+                    Toggle("Run backward", isOn: $clock.runsBackward)
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    if clock.runsBackward { Image(systemName: "backward.fill").font(.system(size: 9)) }
+                    Text(motion.speeds.indices.contains(clock.speedIndex) ? motion.speeds[clock.speedIndex].label : "")
+                }
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .frame(height: 36)
+            }
+            .accessibilityLabel("Speed and direction")
+            Button { clock.reset() } label: {
+                Text("Now")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 8)
+                    .frame(height: 36)
+            }
+        }
+        .foregroundColor(.primary)
+        .lineLimit(1)
+        .padding(4)
+        .atlasGlass(Capsule())
+        .fixedSize()
     }
 }
 

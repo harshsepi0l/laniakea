@@ -91,23 +91,23 @@ enum FactSheetBuilder {
     // MARK: Groups and galaxies
 
     static func group(_ g: GalaxyGroup, _ details: GroupDetails?, _ boundaries: ConstellationBoundaries?) -> FactSheet {
-        // We're inside the Local Group, so its distance and motion relative to us mean something else.
+        // Andromeda's group is the Local Group's other half, so it's described as part of our home.
         let isHome = g.id == GalaxyGroup.localGroupID
         let what = g.isCluster ? "A galaxy cluster" : (g.galaxyCount > 1 ? "A group of galaxies" : "A galaxy with no measured neighbours")
         let place = g.isOnBoundary ? "on Laniakea's edge" : "in Laniakea"
         var sheet = FactSheet(
             title: g.name,
             summary: isHome
-                ? "Our home group: the Milky Way, Andromeda, the Triangulum Galaxy and dozens of smaller galaxies."
+                ? "Andromeda, the Triangulum Galaxy and their satellites: one half of the Local Group. The Milky Way and its own satellites are the other half. Cosmicflows-4 lists only Andromeda's side, as it has no entry for our galaxy."
                 : "\(what) \(place), \(GraphBuilder.lightYearsText(parsecs: g.distanceMpc * 1e6)) away.",
             source: "Cosmicflows-4 (Tully et al. 2023). Names: SIMBAD. Color: RC3."
         )
         sheet.facts = [
-            .init(label: "Galaxies with distances", value: g.galaxyCount.formatted(), detail: isHome ? "besides the Milky Way" : nil),
-            .init(label: isHome ? "Distance to its centre" : "Distance", value: mpc(g.distanceMpc, error: details?.distanceErrorMpc),
+            .init(label: "Galaxies with distances", value: g.galaxyCount.formatted(), detail: isHome ? "on Andromeda's side" : nil),
+            .init(label: "Distance", value: mpc(g.distanceMpc, error: details?.distanceErrorMpc),
                   detail: GraphBuilder.lightYearsText(parsecs: g.distanceMpc * 1e6)),
         ]
-        if !isHome, let v = details?.velocityKmS { sheet.facts.append(lineOfSight(v)) }
+        if let v = details?.velocityKmS { sheet.facts.append(lineOfSight(v)) }
         // Measured against the cosmic background; for nearby groups that is mostly our own motion.
         if !isHome, g.distanceMpc >= 30, let v = details?.peculiarVelocityKmS {
             let error = details?.peculiarVelocityErrorKmS.map { " ± \($0.formatted(.number.precision(.fractionLength(0))))" } ?? ""

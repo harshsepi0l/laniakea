@@ -4,7 +4,9 @@ import simd
 /// A group or cluster of galaxies from Cosmicflows-4 (Tully et al. 2023), identified by the PGC
 /// number of its brightest galaxy.
 struct GalaxyGroup: Codable, Identifiable, Hashable {
-    /// Our own group, led by Andromeda (PGC 2557). Cosmicflows-4 has no entry for the Milky Way.
+    /// Andromeda's group (PGC 2557): Andromeda, Triangulum and their satellites, the Local Group's
+    /// other half. Cosmicflows-4 has no entry for the Milky Way or its satellites, so this is the
+    /// only part of our own Local Group it lists.
     static let localGroupID = 2557
 
     let id: Int
@@ -20,6 +22,9 @@ struct GalaxyGroup: Codable, Identifiable, Hashable {
     let isCluster: Bool
     /// The color of its leading (brightest) galaxy.
     let color: GalaxyColor?
+    /// Measured velocity along our line of sight, as seen from the Sun, km/s; positive is away.
+    /// It includes the expansion of the universe.
+    var velocityKmS: Double?
 }
 
 /// The broad Hubble types.
@@ -109,6 +114,8 @@ struct LaniakeaMap: Codable {
     let centre: SIMD3<Double>
     /// Typical of a spiral like ours: the Milky Way's own color can't be measured from inside it.
     let milkyWayColor: GalaxyColor?
+    /// Every one of the basin's cells in supergalactic Mpc, for its true 3D shape.
+    var cells: [SIMD3<Double>]?
 }
 
 /// A way of measuring a galaxy's distance, as used by Cosmicflows-4.
@@ -218,6 +225,11 @@ struct NakedEyeStar: Codable, Identifiable, Hashable {
     let angularDiameterMas: Double?
     /// Median of published measurements (PASTEL); nil when none exist.
     let measuredTemperatureK: Double?
+    /// Proper motion (Hipparcos new reduction, else the Bright Star Catalogue): μα cos δ and μδ, mas/yr.
+    var pmRAMasPerYear: Double?
+    var pmDecMasPerYear: Double?
+    /// Bright Star Catalogue radial velocity, km/s; positive is away.
+    var radialVelocityKmS: Double?
 
     var name: String { properName ?? designation ?? "HR \(id)" }
 
@@ -269,6 +281,10 @@ struct StarSystem: Codable, Identifiable, Hashable {
     var hd: Int?
     /// Galactic Cartesian position in parsecs, x toward the Galactic Centre, z toward Galactic north.
     let position: SIMD3<Double>
+    /// Proper motion, μα cos δ and μδ in mas/yr, and radial velocity in km/s (Exoplanet Archive).
+    var pmRAMasPerYear: Double?
+    var pmDecMasPerYear: Double?
+    var radialVelocityKmS: Double?
 }
 
 /// A planet orbiting another star, from the NASA Exoplanet Archive.

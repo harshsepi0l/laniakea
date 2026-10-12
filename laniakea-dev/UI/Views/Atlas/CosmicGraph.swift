@@ -42,6 +42,17 @@ struct GraphNode: Identifiable {
     /// Sets the dot's color on the star color scale: a star's surface temperature, or for a galaxy
     /// or group, the color temperature of its B−V.
     var temperatureK: Double?
+    /// Height above the layout plane, in the same unit as `position` (shown in 3D).
+    var depth: Double = 0
+    /// Measured motion in layout units per year, for running time; nil where none is measured.
+    var velocity: SIMD3<Double>?
+    /// Drawn as a black hole (a black disc with white swirls) rather than a glowing dot.
+    var isBlackHole = false
+
+    /// Where it is `years` from now (straight-line motion).
+    func position(atYears years: Double) -> SIMD3<Double> {
+        SIMD3(position.x, position.y, depth) + (velocity ?? .zero) * years
+    }
 }
 
 /// Everything a graph view draws for one place.
@@ -55,12 +66,53 @@ struct GraphScene {
     var region: (cells: [SIMD2<Double>], cellSize: Double)?
     /// The region's edge as line segments, drawn as an orange outline.
     var regionOutline: [(SIMD2<Double>, SIMD2<Double>)] = []
+    /// The region's true 3D boundary as contour lines, one ring per layer of cells (shown in 3D,
+    /// where the flat outline above would mislead).
+    var regionContours: [(SIMD3<Double>, SIMD3<Double>)] = []
+    /// How matter flows, as lines running downstream: through the region in 3D, and across the
+    /// layout plane for the flat map.
+    var flowLines: [[SIMD3<Double>]] = []
+    var planeFlowLines: [[SIMD3<Double>]] = []
+    /// The cosmic web's densest cells, with their density contrast; `planeWeb` is those near the
+    /// layout plane, for the flat map.
+    var web: [(position: SIMD3<Double>, density: Double)] = []
+    var planeWeb: [(position: SIMD3<Double>, density: Double)] = []
     /// Radius in layout units that the first view fits on screen, around `fitCenter`.
     let fitRadius: Double
     var fitCenter: SIMD2<Double> = .zero
+    /// For the 3D view: the height of the place's middle above the layout plane, and the radius
+    /// that holds all of it, when it's more than the flat map's.
+    var fitDepth: Double = 0
+    var fitRadius3D: Double?
     let caption: String
     /// Each node's linked neighbours, built on first use (selection asks every frame).
     let adjacency = AdjacencyCache()
+    /// How this place can be run through time, or nil when nothing here has measured motion.
+    var motion: Motion?
+    /// How fast the shaded region grows with the expansion of space, per year, about the origin
+    /// (the Milky Way); 0 for none.
+    var regionExpansionPerYear: Double = 0
+
+    /// A place's simulation: what it runs, how far it stays accurate, and its speeds.
+    struct Motion {
+        /// Shown with the time control, such as "Measured space motion".
+        let model: String
+        /// What the model leaves out, for the caption while it runs.
+        let note: String
+        /// Years either side of now that the straight-line motion stays right. Beyond it time
+        /// keeps running, marked as a prediction, with `predictionNote` saying why.
+        let reliableYears: Double
+        let predictionNote: String
+        /// Where time stops: the past can't go back further than the universe is old.
+        let maxPastYears: Double
+        let maxFutureYears: Double
+        /// Years per second, with labels.
+        let speeds: [(yearsPerSecond: Double, label: String)]
+        /// The speed a place starts at: one where motion is visible at its scale.
+        var defaultSpeedIndex = 1
+
+        func isPrediction(_ years: Double) -> Bool { abs(years) > reliableYears }
+    }
 
     enum Unit {
         case megaparsecs, parsecs
@@ -96,7 +148,7 @@ final class AdjacencyCache {
 
 enum GraphBuilder {
     /// Groups in Laniakea, seen from above the supergalactic plane, with the Milky Way at the centre.
-    static func laniakea(_ map: LaniakeaMap) -> GraphScene {
+    static func laniakea(_ map: LaniakeaMap, flow: LaniakeaFlow? = nil) -> GraphScene {
         let largest = Double(map.groups.map(\.galaxyCount).max() ?? 1)
         var nodes = map.groups.map { g in
             GraphNode(
@@ -105,7 +157,9 @@ enum GraphBuilder {
                 subtitle: groupSubtitle(g), opens: .group(g), isMuted: g.isOnBoundary,
                 kinds: [g.isCluster ? .cluster : (g.galaxyCount > 1 ? .group : .loneGalaxy)],
                 direction: SkyCoordinates.equatorial(supergalactic: g.position), facts: .group(g),
-                temperatureK: colorTemperature(g.color)
+                temperatureK: colorTemperature(g.color), depth: g.position.z,
+                // Measured line-of-sight velocity, expansion included, along the line from us.
+                velocity: g.velocityKmS.map { simd_normalize(g.position) * $0 * SpaceMotion.megaparsecsPerYearPerKmS }
             )
         }
         nodes.append(GraphNode(
@@ -119,13 +173,43 @@ enum GraphBuilder {
         let xs = map.outlineCells.map(\.x), ys = map.outlineCells.map(\.y)
         let centre = SIMD2(((xs.min() ?? 0) + (xs.max() ?? 0)) / 2, ((ys.min() ?? 0) + (ys.max() ?? 0)) / 2)
         let fit = map.outlineCells.map { simd_distance($0, centre) }.max().map { $0 + map.cellSizeMpc / 2 } ?? 150
-        return GraphScene(
+        var scene = GraphScene(
             nodes: nodes, links: nearestNeighbors(points, k: 2, within: 12), unit: .megaparsecs,
             region: (map.outlineCells, map.cellSizeMpc), regionOutline: outline(cells: map.outlineCells, size: map.cellSizeMpc),
             fitRadius: fit, fitCenter: centre,
             caption: "\(map.groups.filter { !$0.isOnBoundary }.count.formatted()) galaxy groups inside, faint ones on the edge. "
-                + "Shading is Laniakea; empty parts haven't had galaxy distances measured, mostly behind the Milky Way's disc."
+                + (flow == nil ? "Shading is Laniakea; empty parts haven't had galaxy distances measured, mostly behind the Milky Way's disc."
+                   : "White lines show how matter flows and soft points mark the cosmic web (Cosmicflows-4), even where no galaxy has been measured. Flat, they're the slice through the supergalactic plane.")
         )
+        scene.motion = GraphScene.Motion(
+            model: "Measured velocity toward or away from us",
+            note: "Each group moves along our line of sight at its measured velocity, which includes the expansion of space. Sideways motion isn't measured, so it isn't shown.",
+            reliableYears: 1e9,
+            predictionNote: "Predicted: past a billion years, straight lines drift from the truth. Gravity slows and bends each group's path, and the expansion speeds up over time.",
+            // The universe is about 13.8 billion years old.
+            maxPastYears: 1.3e10, maxFutureYears: 2e10,
+            speeds: [(1e8, "100 million yr/s"), (1e9, "1 billion yr/s"), (5e9, "5 billion yr/s")],
+            // Groups move a few thousand km/s across hundreds of Mpc: a billion years a second
+            // shows it.
+            defaultSpeedIndex: 1
+        )
+        scene.regionExpansionPerYear = SpaceMotion.expansionPerYear
+        scene.regionContours = contours(cells: map.cells ?? [], size: map.cellSizeMpc)
+        // Laniakea rises well above and below the flat map's plane: in 3D, frame all of it.
+        if let cells = map.cells, !cells.isEmpty {
+            let middle = SIMD3(centre.x, centre.y, cells.map(\.z).reduce(0, +) / Double(cells.count))
+            scene.fitDepth = middle.z
+            scene.fitRadius3D = cells.map { simd_distance($0, middle) }.max().map { $0 + map.cellSizeMpc / 2 }
+        }
+        if let flow {
+            func d3(_ p: SIMD3<Float>) -> SIMD3<Double> { SIMD3(Double(p.x), Double(p.y), Double(p.z)) }
+            scene.flowLines = flow.lines.map { $0.map(d3) }
+            scene.planeFlowLines = flow.planeLines.map { $0.map { SIMD3(Double($0.x), Double($0.y), 0) } }
+            let cells = flow.web.map { (position: d3($0.position), density: Double($0.density), inPlane: $0.inPlane) }
+            scene.web = cells.map { ($0.position, $0.density) }
+            scene.planeWeb = cells.filter(\.inPlane).map { (SIMD3($0.position.x, $0.position.y, 0), $0.density) }
+        }
+        return scene
     }
 
     /// Galaxies and groups go on the same color scale as stars through their B−V.
@@ -167,7 +251,9 @@ enum GraphBuilder {
                 subtitle: "\(g.morphology.map { "\($0) · " } ?? "")\(distanceNumber(g.distanceMpc))\(error) Mpc away", opens: nil,
                 kinds: [ObjectKind.galaxy(morphology: g.morphology)],
                 direction: SkyCoordinates.equatorial(supergalactic: g.position), facts: .galaxy(g, groupName: group.name),
-                temperatureK: colorTemperature(g.color)
+                temperatureK: colorTemperature(g.color),
+                // Depth only where each galaxy's own distance places it; on the sky layout there is none.
+                depth: useDistances ? (g.position - centre).z : 0
             )
         }
         let hub = galaxies.firstIndex { $0.id == group.id }
@@ -179,7 +265,7 @@ enum GraphBuilder {
             nodes.append(GraphNode(
                 id: "milky-way", name: "Milky Way", position: SIMD2(here.x, here.y), size: 0.8,
                 subtitle: "Our galaxy · You are here", opens: .milkyWay, isHere: true, facts: .milkyWay,
-                temperatureK: colorTemperature(milkyWayColor)
+                temperatureK: colorTemperature(milkyWayColor), depth: here.z
             ))
             if let hub { links.append((hub, nodes.count - 1)) }
         }
@@ -190,7 +276,8 @@ enum GraphBuilder {
         let fit = max(spread.isEmpty ? 1 : spread[Int(Double(spread.count - 1) * 0.85)], anchors.max() ?? 0, 0.2) * 1.2
         return GraphScene(
             nodes: nodes, links: links, unit: .megaparsecs, region: nil, fitRadius: fit,
-            caption: useDistances ? "Positions from each galaxy's distance" : "Positions on the sky; distances within the group are too uncertain to show depth"
+            caption: (useDistances ? "Positions from each galaxy's distance" : "Positions on the sky; distances within the group are too uncertain to show depth")
+                + (group.id == GalaxyGroup.localGroupID ? ". With the Milky Way, added here, they make up the Local Group." : "")
         )
     }
 
@@ -210,7 +297,8 @@ enum GraphBuilder {
                 opens: .starSystem(s),
                 kinds: [ObjectKind.star(spectralType: s.spectralType, temperatureK: s.temperatureK), .withPlanets] + (bright != nil ? [.nakedEye] : []),
                 direction: SkyCoordinates.equatorial(galactic: s.position), facts: .starSystem(s),
-                temperatureK: s.temperatureK
+                temperatureK: s.temperatureK, depth: s.position.z,
+                velocity: (s.velocityKmS ?? bright?.velocityKmS).map { $0 * SpaceMotion.parsecsPerYearPerKmS }
             )
         }
         let hostHDs = Set(systems.compactMap(\.hd))
@@ -225,7 +313,8 @@ enum GraphBuilder {
                 opens: nil,
                 kinds: [ObjectKind.star(spectralType: star.spectralType, temperatureK: star.temperatureK), .nakedEye],
                 direction: SkyCoordinates.cartesian(longitudeDeg: star.raDeg, latitudeDeg: star.decDeg, distance: 1),
-                facts: .nakedEyeStar(star), temperatureK: star.temperatureK
+                facts: .nakedEyeStar(star), temperatureK: star.temperatureK, depth: p.z,
+                velocity: star.velocityKmS.map { $0 * SpaceMotion.parsecsPerYearPerKmS }
             ))
         }
         nodes.append(GraphNode(
@@ -238,11 +327,20 @@ enum GraphBuilder {
         // Fit most systems; a few microlensing finds sit thousands of parsecs away.
         let distances = systems.map(\.distanceParsecs).sorted()
         let fit = distances.isEmpty ? 100 : distances[Int(Double(distances.count - 1) * 0.6)]
-        return GraphScene(
+        var scene = GraphScene(
             nodes: nodes, links: nearestNeighbors(points, k: 2, within: 40), unit: .parsecs, region: nil,
             fitRadius: fit,
             caption: "\(systems.count.formatted()) stars with confirmed planets and \(visible.count.formatted()) more you can see with your eyes"
         )
+        scene.motion = GraphScene.Motion(
+            model: "Measured space motion",
+            note: "Stars move along their measured paths relative to the Sun: proper motion across the sky and, where measured, radial velocity. Straight-line paths hold for about a million years.",
+            reliableYears: 1e6,
+            predictionNote: "Predicted: past a million years, straight lines drift from the truth. Real paths curve as each star, and the Sun, orbit the Galaxy every 230 million years.",
+            maxPastYears: 1e9, maxFutureYears: 1e9,
+            speeds: [(100, "100 yr/s"), (1000, "1,000 yr/s"), (10000, "10,000 yr/s"), (100_000, "100,000 yr/s"), (1_000_000, "1 million yr/s")]
+        )
+        return scene
     }
 
     /// The edge of a region of grid cells (given by their centres) as segments, by marching squares:
@@ -272,6 +370,21 @@ enum GraphBuilder {
                 case 10: segments += [(left, bottom), (right, top)]
                 default: break
                 }
+            }
+        }
+        return segments
+    }
+
+    /// A 3D region of cells as a stack of outlines, one through the middle of each layer of cells,
+    /// like contour lines on a map but around the shape's edge at every height.
+    static func contours(cells: [SIMD3<Double>], size: Double) -> [(SIMD3<Double>, SIMD3<Double>)] {
+        var layers: [Int: [SIMD2<Double>]] = [:]
+        for c in cells { layers[Int(floor(c.z / size)), default: []].append(SIMD2(c.x, c.y)) }
+        var segments: [(SIMD3<Double>, SIMD3<Double>)] = []
+        for (layer, flat) in layers {
+            let z = (Double(layer) + 0.5) * size
+            for (a, b) in outline(cells: flat, size: size) {
+                segments.append((SIMD3(a.x, a.y, z), SIMD3(b.x, b.y, z)))
             }
         }
         return segments

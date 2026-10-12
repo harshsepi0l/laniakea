@@ -30,14 +30,20 @@ struct Uniforms {
     float pixelsPerPoint;
     float zoom;
     float detailThreshold;    // node size below which dots draw faint
+    float time;               // years from now
+    float perspective;        // camera distance in layout units; 0 looking straight down
+    float expansion;          // the region's growth per year about expansionOrigin
+    float3 expansionOrigin;   // the Milky Way, relative to the fit centre
 };
 
 struct Sprite {
     float4 color;             // straight alpha
     float3 position;
+    float3 velocity;          // layout units per year
     float size;               // node size 0...1, which sets the dot radius
-    float shape;              // 0 disc, 1 glow, 2 ring
-    float extra;              // glow: multiple of the dot radius; ring: points outside the dot
+    float shape;              // 0 disc, 1 glow, 2 ring, 3 glow sized in layout units, 4 black hole
+    float extra;              // glow: multiple of the dot radius; ring: points outside the dot;
+                              // shape 3: radius in layout units
     float width;              // ring line width in points
     float faintable;          // 1: fades when smaller than the detail threshold
 };
@@ -46,6 +52,8 @@ struct Segment {
     float4 color;
     float3 a;
     float3 b;
+    float3 velocityA;
+    float3 velocityB;
     float width;              // points
     float soft;               // 1: a soft glow that fades across its width
 };
@@ -75,11 +83,12 @@ struct SpriteOut {
 
 vertex SpriteOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
                               constant Sprite *sprites [[buffer(0)]],
-                              constant Uniforms &u [[buffer(1)]]) {
+                              constant Uniforms &u [[buffer(1)]],
+                              constant float &opacity [[buffer(2)]]) {
     Sprite s = sprites[iid];
     float dot = dotRadius(s.size, u.zoom);
     float radius = dot, inner = 0, outer = 0;
-    if (s.shape == 1) {
+    if (s.shape == 1 || s.shape == 4) {
         radius = dot * s.extra;
     } else if (s.shape == 2) {
         float r = dot + s.extra;
@@ -88,27 +97,77 @@ vertex SpriteOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
         radius = outer;
     }
     float ppp = u.pixelsPerPoint;
+    float3 here = s.position + s.velocity * u.time;
+    float4 centre = u.worldToClip * float4(here, 1.0);
+    SpriteOut out;
+    if (centre.w <= 0.0 || (u.perspective > 0.0 && centre.w < u.perspective * 0.08)) {
+        // Behind the camera, or so close it would fill the screen.
+        out.position = float4(2, 2, 0, 1);
+        out.color = float4(0);
+        out.local = float2(0);
+        out.radius = 0; out.ringInner = 0; out.ringOuter = 0; out.shape = 0;
+        return out;
+    }
+    float shape = s.shape;
+    if (shape == 3 && centre.w > 0.0) {
+        // A glow as big as a region of space: measure its radius on screen along each axis.
+        float2 half_viewport = u.viewport * 0.5;
+        float2 c0 = centre.xy / centre.w * half_viewport;
+        float r = 0;
+        for (int axis = 0; axis < 3; axis++) {
+            float3 offset = float3(0);
+            offset[axis] = s.extra;
+            float4 c = u.worldToClip * float4(here + offset, 1.0);
+            if (c.w > 0.0) { r = max(r, length(c.xy / c.w * half_viewport - c0)); }
+        }
+        radius = min(r, 600.0) / ppp;
+        shape = 1;
+    } else if (u.perspective > 0.0) {
+        // Nearer objects draw a little bigger in 3D.
+        float nearness = clamp(u.perspective / centre.w, 0.6, 1.8);
+        radius *= nearness; inner *= nearness; outer *= nearness;
+    }
     // One extra pixel all round for antialiasing.
     float extent = radius * ppp + 1.0;
     float2 corner = float2((vid & 1) ? 1.0 : -1.0, (vid & 2) ? 1.0 : -1.0);
-    float4 centre = u.worldToClip * float4(s.position, 1.0);
 
-    SpriteOut out;
     out.position = centre + float4(corner * extent * 2.0 / u.viewport * centre.w, 0, 0);
     float4 c = s.color;
+    c.a *= opacity;
     if (s.faintable > 0.5 && s.size < u.detailThreshold) { c.a *= 0.6; }
     out.color = c;
     out.local = corner * extent;
     out.radius = radius * ppp;
     out.ringInner = inner * ppp;
     out.ringOuter = outer * ppp;
-    out.shape = s.shape;
+    out.shape = shape;
     return out;
 }
 
 fragment float4 spriteFragment(SpriteOut in [[stage_in]]) {
     float d = length(in.local);
     float a;
+    if (in.shape == 4) {
+        // A black hole: a black disc inside a thin bright photon ring, with white squiggles
+        // spiralling in from around it and fading outward.
+        float core = in.radius * 0.38;
+        float o = in.color.a;
+        if (d < core - 0.75) { return float4(0, 0, 0, o); }
+        float ring = saturate(1.0 - abs(d - core) / 1.4);
+        float t = saturate((d - core) / (in.radius - core));
+        float angle = atan2(in.local.y, in.local.x);
+        // Three arms winding inward on a log spiral, drawn as thin lines.
+        float phase = 3.0 * angle + 7.0 * log(max(d, 1.0) / core);
+        // Plain products, not pow(): fast-math pow(0, y) gives NaN, which hid the swirls.
+        float arm = saturate(1.0 - abs(sin(phase)) * 1.5);
+        float fade = 1.0 - t;
+        float swirl = arm * arm * fade * 1.1;
+        float white = max(ring, swirl) * o;
+        // Black behind the swirl, so it reads on light backgrounds too.
+        float body = (d < core + 1.0 ? 1.0 : 0.0) * o;
+        float alpha = max(white, body);
+        return float4(float3(white), alpha);
+    }
     if (in.shape == 1) {
         // Fades linearly to clear at the edge, like the radial gradient it replaces.
         a = saturate(1.0 - d / in.radius);
@@ -133,10 +192,19 @@ struct SegmentOut {
 
 vertex SegmentOut segmentVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
                                 constant Segment *segments [[buffer(0)]],
-                                constant Uniforms &u [[buffer(1)]]) {
+                                constant Uniforms &u [[buffer(1)]],
+                                constant float &opacity [[buffer(2)]]) {
     Segment s = segments[iid];
-    float4 ca = u.worldToClip * float4(s.a, 1.0);
-    float4 cb = u.worldToClip * float4(s.b, 1.0);
+    float4 ca = u.worldToClip * float4(s.a + s.velocityA * u.time, 1.0);
+    float4 cb = u.worldToClip * float4(s.b + s.velocityB * u.time, 1.0);
+    float near = u.perspective * 0.08;
+    if (ca.w <= near || cb.w <= near) {
+        // An end behind the camera, or so close it would streak across the screen: skip it.
+        SegmentOut gone;
+        gone.position = float4(2, 2, 0, 1);
+        gone.color = float4(0); gone.across = 0; gone.halfWidth = 1; gone.soft = 0;
+        return gone;
+    }
     float2 half_viewport = u.viewport * 0.5;
     float2 pa = ca.xy / ca.w * half_viewport;
     float2 pb = cb.xy / cb.w * half_viewport;
@@ -157,6 +225,7 @@ vertex SegmentOut segmentVertex(uint vid [[vertex_id]], uint iid [[instance_id]]
     SegmentOut out;
     out.position = float4(p / half_viewport, 0, 1);
     out.color = s.color;
+    out.color.a *= opacity;
     out.across = side * extent;
     out.halfWidth = halfWidth;
     out.soft = s.soft;
@@ -187,7 +256,10 @@ vertex RegionOut regionVertex(uint vid [[vertex_id]],
                               constant RegionQuad &quad [[buffer(0)]],
                               constant Uniforms &u [[buffer(1)]]) {
     RegionOut out;
-    out.position = u.worldToClip * quad.corners[vid];
+    float4 corner = quad.corners[vid];
+    // The region grows with the expansion of space, about the Milky Way.
+    corner.xyz += (corner.xyz - u.expansionOrigin) * u.expansion * u.time;
+    out.position = u.worldToClip * corner;
     out.uv = float2((vid & 1) ? 1.0 : 0.0, (vid & 2) ? 1.0 : 0.0);
     return out;
 }
