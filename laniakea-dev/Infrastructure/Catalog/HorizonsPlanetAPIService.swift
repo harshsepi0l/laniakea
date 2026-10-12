@@ -8,7 +8,7 @@ class HorizonsPlanetAPIService: PlanetRepo {
     /// Horizons IDs for Mercury through Neptune.
     private static let bodyIDs = ["199", "299", "399", "499", "599", "699", "799", "899"]
 
-    private let cache = DiskCache<[Planet]>(name: "horizons-planets")
+    private let cache = DiskCache<[Planet]>(name: "horizons-planets-v2")
 
     func loadPlanets() async throws -> [Planet] {
         if let fresh = cache.load(maxAge: 12 * 3600) { return fresh }

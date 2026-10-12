@@ -189,10 +189,12 @@ struct SkyView: View {
             case .star:
                 labels.append((object.name, p, dotRadius(object), isSelected))
             case .planet:
+                // Sized by brightness like the stars, a little larger so the fainter planets stay findable.
                 let color = object.composition.swiftUI(dark: true)
-                glow(&context, p, 14, color)
-                context.fill(Path(ellipseIn: CGRect(x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9)), with: .color(color))
-                labels.append((object.name, p, 5, isSelected))
+                let r = planetRadius(object)
+                glow(&context, p, r * 3, color)
+                context.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: .color(color))
+                labels.append((object.name, p, r + 0.5, isSelected))
             case .sun:
                 let color = StarColor.swiftUI(temperature: 5772, dark: true)
                 glow(&context, p, 40, color)
@@ -230,6 +232,11 @@ struct SkyView: View {
     /// A star's dot radius: brighter stars draw bigger.
     private func dotRadius(_ object: SkyObject) -> CGFloat {
         CGFloat(min(max(3.4 - 0.5 * object.magnitude, 0.7), 5))
+    }
+
+    /// A planet's dot radius: the star scale one point larger, from 1.5 (Neptune) to 5.5 (Venus).
+    private func planetRadius(_ object: SkyObject) -> CGFloat {
+        CGFloat(min(max(4.4 - 0.5 * object.magnitude, 1.5), 5.5))
     }
 
     /// Four corner brackets around the pick, and a ring that grows and fades when it arrives.

@@ -125,12 +125,13 @@ final class SkyViewModel: NSObject, ObservableObject {
             magnitude: -26.7, temperatureK: 5772
         )]
         for planet in planets where planet.id != Planet.earthID {
-            let fromEarth = planet.orbit.position(at: date) - earthAt
+            let planetAt = planet.orbit.position(at: date)
             solar.append(SkyObject(
                 id: "planet-\(planet.id)", name: planet.name, kind: .planet(planet),
-                equatorial: SkyCoordinates.equatorial(ecliptic: fromEarth),
-                // Planets are drawn like bright stars; their exact magnitude isn't needed here.
-                magnitude: -1, temperatureK: nil, composition: planet.composition
+                equatorial: SkyCoordinates.equatorial(ecliptic: planetAt - earthAt),
+                // Real brightness tonight, so Neptune doesn't outshine the stars around it.
+                magnitude: PlanetMagnitude.apparent(planetID: planet.id, heliocentric: planetAt, earth: earthAt) ?? 0,
+                temperatureK: nil, composition: planet.composition
             ))
         }
         objects = objects.filter { if case .star = $0.kind { return true } else { return false } } + solar
