@@ -146,7 +146,13 @@ final class SkyViewModel: NSObject, ObservableObject {
                 temperatureK: nil, composition: planet.composition
             ))
         }
-        objects = objects.filter { if case .star = $0.kind { return true } else { return false } } + solar
+        // Replace only the Sun and planets; stars and the Moon (placed by its own loop) stay.
+        objects = objects.filter {
+            switch $0.kind {
+            case .star, .moon: return true
+            default: return false
+            }
+        } + solar
     }
 
     // MARK: The Moon
